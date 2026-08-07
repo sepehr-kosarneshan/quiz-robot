@@ -1,0 +1,5 @@
+pyTelegramBotAPI==4.34.0
+requests==2.34.2
+python-dotenv==1.2.2
+mysql-connector-python==9.7.0
+requests-forwarder==1.0.1
