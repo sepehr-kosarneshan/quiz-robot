@@ -85,6 +85,8 @@ def create_table_exam():
             id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             special_code VARCHAR(100) NOT NULL UNIQUE,
             designer_id INT UNSIGNED,
+            start_time DATETIME NOT NULL,    
+            end_time DATETIME NOT NULL,   
             register_time DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (designer_id) REFERENCES users(id) ON DELETE CASCADE
