@@ -33,5 +33,15 @@ def get_categories():
     connection.close()
     return result
 
+def get_support_status(user_id , user_mid) :
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor(dictionary=True)
+    SQL_QUERY = 'SELECT `admin_id` FROM user_support_request WHERE `user_id` = (%s) and `message_id` = (%s)'
+    cur.execute(SQL_QUERY , (user_id , user_mid))
+    result = cur.fetchone()
+    cur.close()
+    connection.close()
+    return result
+
 if __name__ == '__main__':
-    print(get_users())
+    print(get_support_status(1 , 2250))

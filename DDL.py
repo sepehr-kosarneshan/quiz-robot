@@ -138,6 +138,28 @@ def create_user_answer_table():
     cur.close()
     connection.close()
 
+def create_user_user_support_request():
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor()
+
+    cur.execute('''
+        CREATE TABLE user_support_request (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT UNSIGNED NOT NULL,           
+            message_id INT UNSIGNED NOT NULL,
+            text TEXT NOT NULL,
+            admin_id INT UNSIGNED,
+            admin_text TEXT ,
+            register_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE CASCADE
+        );''')
+    connection.commit()
+    print('table user_support_request created')
+    cur.close()
+    connection.close()
+
 if __name__ == '__main__':
     create_database()
     create_table_users()
@@ -146,5 +168,6 @@ if __name__ == '__main__':
     create_table_exam()
     create_table_exam_questions()
     create_user_answer_table()
+    create_user_user_support_request()
 
 

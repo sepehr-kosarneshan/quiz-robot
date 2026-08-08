@@ -5,6 +5,7 @@ text = {
     'support_request'           : 'برای پاسخ به این پیام کلیک نمایید',
     'support_message'           : 'پاسخ خود را بنویسید',
     'support_answered'          : 'پاسخ با موفقیت برای کاربر ارسال شد',
+    'support_another_admin'     : 'این پیام توسط ادمین دیگر پاسخ داده شد',
     'hidden_user_reply'         : 'امکان ارسال پیام وجود ندارد، از دکمه پاسخ استفاده نمایید',
     'quiz_creating_command'     : 'ساخت کوئیز',
     'show_categories'           : 'مشاهده موضوعات',

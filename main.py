@@ -185,11 +185,16 @@ def callback_handler(call):
     data = call.data
     if data.startswith('anssupport'):
         _,user_cid,user_mid = data.split('_')
-        user_step.setdefault(cid , f'adminanswer_{user_cid}_{user_mid}')
-        bot.send_message(cid , text['support_message'])
-        bot.edit_message_reply_markup(cid , mid , reply_markup=None)
-        bot.answer_callback_query(call_id , 'answer')
-
+        if get_support_status(user_id = find_user_id(user_cid)['ID'] , user_mid= user_mid)['admin_id'] is None :
+            user_step.setdefault(cid , f'adminanswer_{user_cid}_{user_mid}')
+            bot.send_message(cid , text['support_message'])
+            bot.edit_message_reply_markup(cid , mid , reply_markup=None)
+            bot.answer_callback_query(call_id , 'answer')
+        else :
+            bot.answer_callback_query(call_id , 'answered')
+            bot.delete_message(cid , mid)
+            bot.send_message(cid , text['support_another_admin'])
+            
     elif data.startswith('categorychoice'):
         _,category_id = data.split('_')
         category_id = int(category_id)
@@ -439,13 +444,16 @@ def support_request_handler(message):
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton('Answer' , callback_data=f'anssupport_{cid}_{mid}'))
     # admin
-    bot.forward_message(admins[0] , cid , mid)
-    bot.send_message(admins[0] , text['support_request'] , reply_markup=markup)
+    for i in range(len(admins)):
+        bot.forward_message(admins[i] , cid , mid)
+        bot.send_message(admins[i] , text['support_request'] , reply_markup=markup)
     # user
     bot.copy_message(cid , channel_id , channel_messages['sended_support']) #to user who wanted support
+    print(message.text)
+    add_support_request(user_id = find_user_id(cid)['ID'] , message_id = mid , text = message.text)
     user_step.pop(cid)
 
-@bot.message_handler(func = lambda m : user_step.get(m.chat.id , '_').startswith('adminanswer')) # inline 
+@bot.message_handler(func = lambda m : user_step.get(m.chat.id , '_').startswith('adminanswer')) # inline pressed
 def admin_answer_handler(message):
     cid = message.chat.id
     if is_spam(cid) : 
@@ -457,24 +465,9 @@ def admin_answer_handler(message):
     bot.copy_message(user_cid,cid, message.message_id , reply_to_message_id=user_mid)
     bot.send_message(cid , text['support_answered'])
     user_step.pop(cid)
-
-@bot.message_handler(func = lambda m : (m.chat.id in admins) and (reply_message_type(m)!=False)) #reply message for support
-def reply_support_message_handler(message):
-    cid = message.chat.id
-    print(reply_message_type(message))
-    if is_spam(cid) : 
-        return 
-    manage_user(message , cid)
-    status = reply_message_type(message)
-    if status == 'hidden_user' :
-        bot.send_message(cid , text['hidden_user_reply'])
-    else :
-        user_cid = message.reply_to_message.forward_origin.sender_user.id
-        user_mid = message.reply_to_message.id
-        bot.send_message(user_cid , message.text , reply_to_message_id=user_mid)
-        bot.send_message(cid , text['support_answered'])
-
+    update_support_status(user_id= find_user_id(user_cid)['ID'] , user_mid=user_mid, admin_id=find_user_id(cid)['ID'], admin_text=message.text)
+    
 get_admins()
 get_teachers()
 print('bot is running !')
-bot.infinity_polling()
+bot.infinity_polling(skip_pending=True)

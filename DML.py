@@ -64,7 +64,34 @@ def add_question(category_id , designer_id , text , op1 , op2 , op3 , op4 ,ansop
     connection.close()
     return result
 
+def add_support_request(user_id , message_id , text):
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor()
+    SQL_QUERY = '''
+        INSERT INTO user_support_request (`user_id`,`message_id`,`text`)
+        VALUES (%s , %s , %s)
+    '''
+    cur.execute(SQL_QUERY , (user_id , message_id , text))
+    result = cur.lastrowid
+    connection.commit()
+    cur.close()
+    connection.close()
+    return result
+
+def update_support_status(user_id , user_mid , admin_id , admin_text) :
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor(dictionary=True)
+    SQL_QUERY = '''update user_support_request
+                    SET `admin_id` = (%s) , `admin_text` = (%s)
+                    WHERE `user_id` = (%s) AND `message_id` = (%s);
+                '''
+    cur.execute(SQL_QUERY , (admin_id , admin_text , user_id , user_mid))
+    connection.commit()
+    cur.close()
+    connection.close()
+    return True
+
 if __name__ == '__main__' :
-    edit_user_username(1,None)
+    update_support_status(1 , 1 , 1 , 'alieke salam')
     #print(add_categories('structure'))
 
