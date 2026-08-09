@@ -421,7 +421,7 @@ def add_category_admin(message):
     if is_spam(cid) : 
         return 
     manage_user(message , cid)
-    if cid not in admins:
+    if (cid not in teachers) and (cid not in admins):
         return 
     bot.send_message(cid , text['add_category_admin'])
     user_step[cid] = 'getting_category_name'
@@ -444,7 +444,7 @@ def choice_category_handler(message):
     if is_spam(cid) : 
         return
     manage_user(message , cid)
-    if cid not in admins :
+    if (cid not in teachers) and (cid not in admins):
         return 
     data = get_categories()
     markup = create_inlinekeyboard_for_categoris(data , 0)
