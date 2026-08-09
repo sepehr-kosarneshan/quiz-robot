@@ -1,6 +1,6 @@
 text = {
     'start_command'             : 'شروع کار با ربات',
-    'help_command'              : 'راهنمای نحوه کار با ربات',
+    'help_command'              : 'راهنمای کار با ربات',
     'support_command'           : 'ارتباط با پشتیبانی',
     'support_request'           : 'برای پاسخ به این پیام کلیک نمایید',
     'support_message'           : 'پاسخ خود را بنویسید',
@@ -26,4 +26,15 @@ text = {
     'request_teacher'           : 'دسترسی طراحی سوال و آزمون',
     'buttons_choice'            : 'می توانید گزینه های زیر را انتخاب نمایید',
     'user_teacher_added'        : 'کاربر تایید صلاحیت شده است',
+}
+
+Button = {
+    'start'         : text['start_command']         + '💡',
+    'help'          : text['help_command']          + '❓',
+    'quiz'          : text['quiz_creating_command'] + '✖️➗',
+    'support'       : text['support_command']       + '📞',
+    'addquestion'   : text['add_question_teacher']  + '⚡',
+    'addcategory'   : text['add_category_command']  + '⚡',
+    'showcategory'  : text['show_categories']       + 'ℹ️',
+    'req_teacher'   : text['request_teacher']       + '🧑‍🏫',
 }

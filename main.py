@@ -138,7 +138,7 @@ def reply_message_type(message):
         reply_id = False
     return reply_id
 
-def show_commands(cid , command):
+def show_commands(cid):
     result = ''
     for key , value in command.items():
         result += f'✅ {key} : _{value}_\n'
@@ -151,6 +151,16 @@ def show_commands(cid , command):
         for key , value in admin_commands.items():
             result += f'✅ {key} : _{value}_\n'
     return result
+
+def create_start_keyboard(cid) :
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+    keyboard.add(Button['start'] , Button['help'],Button['support'])
+    keyboard.add(Button['showcategory'])
+    keyboard.add(Button['quiz'])
+    keyboard.add(Button['req_teacher'])
+    if cid in teachers :
+        keyboard.add(Button['addquestion'],Button['addcategory'])
+    return keyboard
 
 def category_pages(clist) : # clist : DQL.get_categories()
     result = []
@@ -289,7 +299,9 @@ def callback_handler(call):
                 elif inlinestatus == '11' :
                     new_markup = create_inlinekeyboard_for_teacher_request(user_cid , user_mid , answer=True , addteacher=False)
                 add_teacher_with_tel_id(user_cid)
-                bot.copy_message(user_cid , channel_id , channel_messages['you_added_teacher'] , reply_to_message_id=user_mid)
+                teachers.append(user_cid)
+                keyboard = create_start_keyboard(user_cid)
+                bot.copy_message(user_cid , channel_id , channel_messages['you_added_teacher'] , reply_to_message_id=user_mid , reply_markup=keyboard)
                 bot.send_message(cid , f'{user_cid} added to teachers')
                 bot.edit_message_reply_markup(cid , mid , reply_markup= new_markup)
                 bot.answer_callback_query(call_id , 'user added to teachers')
@@ -317,29 +329,30 @@ def callback_handler(call):
                 #print(f'{e}')
             bot.answer_callback_query(call_id , 'show information')
 
-@bot.message_handler(commands=['start'])
+@bot.message_handler(func=lambda m: m.text in ['/start', Button['start']])
 def start_command_handler(message):
     cid = message.chat.id
     if is_spam(cid) : 
         return 
     manage_user(message , cid)
     print(admins)
-    bot.copy_message(cid , channel_id , channel_messages['start'])
-    bot.send_message(cid , show_commands(cid, command) , parse_mode='MarkdownV2')
-    # admins
+    markup = create_start_keyboard(cid)
+    bot.copy_message(cid , channel_id , channel_messages['start'] , reply_markup = markup)
+    bot.send_message(cid , show_commands(cid) , parse_mode='MarkdownV2')
 
-@bot.message_handler(commands=['help'])
+@bot.message_handler(func=lambda m: m.text in ['/help', Button['help']])
 def start_command_handler(message):
     cid = message.chat.id
     if is_spam(cid) : 
         return 
     manage_user(message , cid)
-    bot.copy_message(cid , channel_id , channel_messages['help'])
-    bot.send_message(cid , show_commands(cid, command) , parse_mode='MarkdownV2')
+    markup = create_start_keyboard(cid)
+    bot.copy_message(cid , channel_id , channel_messages['help'] , reply_markup = markup)
+    bot.send_message(cid , show_commands(cid) , parse_mode='MarkdownV2')
 
 # Teacher Request ------------------------------------
-    
-@bot.message_handler(commands=['reqteach'])
+
+@bot.message_handler(func=lambda m: m.text in ['/reqteach', Button['req_teacher']])
 def request_teacher_command_handler(message):
     cid = message.chat.id
     if is_spam(cid) :
@@ -380,7 +393,7 @@ def teach_request_answer_handler(message) :
 
 # ------------------------------------
 
-@bot.message_handler(commands=['quiz'])
+@bot.message_handler(func=lambda m: m.text in ['/quiz', Button['quiz']])
 def quiz_command_handler(message):
     cid = message.chat.id
     if is_spam(cid) : 
@@ -390,7 +403,7 @@ def quiz_command_handler(message):
     # ........ data base 
     # Working here ...
 
-@bot.message_handler(commands=['support']) 
+@bot.message_handler(func=lambda m: m.text in ['/support', Button['support']]) 
 def support_command_handler(message):
     cid = message.chat.id
     if is_spam(cid) : 
@@ -400,7 +413,7 @@ def support_command_handler(message):
     user_step.setdefault(cid , '')
     user_step[cid] = 'support_request'
 
-@bot.message_handler(commands=['showcategory'])
+@bot.message_handler(func=lambda m: m.text in ['/showcategory', Button['showcategory']])
 def showcategory_command_handler(message):
     cid = message.chat.id
     if is_spam(cid) : 
@@ -415,7 +428,7 @@ def showcategory_command_handler(message):
 
 # -------------------------------------------- category Teacher
 
-@bot.message_handler(commands=['addcategory'])
+@bot.message_handler(func=lambda m: m.text in ['/addcategory', Button['addcategory']])
 def add_category_admin(message):
     cid = message.chat.id
     if is_spam(cid) : 
@@ -438,7 +451,7 @@ def getting_ctgy_name(message):
 
 # -------------------------------------------- add question Teacher
 
-@bot.message_handler(commands=['addquestion'])
+@bot.message_handler(func=lambda m: m.text in ['/addquestion', Button['addquestion']])
 def choice_category_handler(message):
     cid = message.chat.id
     if is_spam(cid) : 
@@ -610,7 +623,13 @@ def admin_answer_handler(message):
     bot.send_message(cid , text['support_answered'])
     user_step.pop(cid)
     update_support_status(user_id= find_user_id(user_cid)['ID'] , user_mid=user_mid, admin_id=find_user_id(cid)['ID'], admin_text=message.text)
-    
+
+@bot.message_handler(func = lambda m : True)
+def every_messages_handler(message):
+    cid = message.chat.id
+    markup = create_start_keyboard(cid)
+    bot.copy_message(cid , channel_id , channel_messages['help'] , reply_markup=markup)
+
 get_admins()
 get_teachers()
 print('bot is running !')
