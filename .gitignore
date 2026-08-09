@@ -1,5 +1,6 @@
 *.log
 *.png
 *.env
+*.xlsx
 __pycache__
 venv

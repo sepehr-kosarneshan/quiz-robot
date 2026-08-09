@@ -9,7 +9,8 @@ text = {
     'hidden_user_reply'         : 'امکان ارسال پیام وجود ندارد، از دکمه پاسخ استفاده نمایید',
     'quiz_creating_command'     : 'ساخت کوئیز',
     'show_categories'           : 'مشاهده موضوعات',
-    'add_question_admin'        : 'اضافه کردن یک سوال',
+    'add_question_teacher'      : 'اضافه کردن یک سوال',
+    'add_teacher_admin'         : 'اضافه کردن معلم',
     'add_category_command'      : 'اضافه کردن موضوع',
     'add_category_admin'        : 'نام موضوع مورد نظر را وارد نمایید',
     'choice_category_admin'     : 'لطفا موضوع سوال خود را انتخاب نمایید',
@@ -22,4 +23,7 @@ text = {
     'get_optionanswer'          : 'گزینه صحیح را وارد نمایید',
     'get_textanswer'            : 'پاسخ تشریحی سوال را وارد کنید، یا به صورت متن یا به صورت یک عکس',
     'questoin_added'            : 'سوال مورد نظر در دیتابیس ذخیره شد',
+    'request_teacher'           : 'دسترسی طراحی سوال و آزمون',
+    'buttons_choice'            : 'می توانید گزینه های زیر را انتخاب نمایید',
+    'user_teacher_added'        : 'کاربر تایید صلاحیت شده است',
 }

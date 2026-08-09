@@ -11,6 +11,28 @@ def find_user_id(telegram_id):
     connection.close()
     return result
 
+def get_user_information(telegram_id):
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor(dictionary=True)
+    SQL_QUERY = 'SELECT * FROM USERS WHERE `telegram_id` = %s'
+    cur.execute(SQL_QUERY , (telegram_id,))
+    result = cur.fetchone()
+    cur.close()
+    connection.close()
+    return result
+
+def get_is_teacher_status(telegram_id) :
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor(dictionary=True)
+    SQL_QUERY = '''
+        SELECT `is_teacher` FROM USERS WHERE `telegram_id` = (%s)
+    '''
+    cur.execute(SQL_QUERY , (telegram_id,))
+    result = cur.fetchone()
+    cur.close()
+    connection.close()
+    return result['is_teacher']
+
 def get_users():
     connection = mysql.connector.connect(**config , database = database_name)
     cur = connection.cursor(dictionary=True)
@@ -44,4 +66,4 @@ def get_support_status(user_id , user_mid) :
     return result
 
 if __name__ == '__main__':
-    print(get_support_status(1 , 2250))
+    print(get_is_teacher_status(1454840970))

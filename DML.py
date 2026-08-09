@@ -80,8 +80,8 @@ def add_support_request(user_id , message_id , text):
 
 def update_support_status(user_id , user_mid , admin_id , admin_text) :
     connection = mysql.connector.connect(**config , database = database_name)
-    cur = connection.cursor(dictionary=True)
-    SQL_QUERY = '''update user_support_request
+    cur = connection.cursor()
+    SQL_QUERY = '''UPDATE user_support_request
                     SET `admin_id` = (%s) , `admin_text` = (%s)
                     WHERE `user_id` = (%s) AND `message_id` = (%s);
                 '''
@@ -90,8 +90,19 @@ def update_support_status(user_id , user_mid , admin_id , admin_text) :
     cur.close()
     connection.close()
     return True
+def add_teacher_with_tel_id(telegram_id) :
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor()
+    SQL_QUERY = '''
+        UPDATE USERS SET `is_teacher` = 1 WHERE `telegram_id` = (%s)
+    '''
+    cur.execute(SQL_QUERY , (telegram_id,))
+    connection.commit()
+    cur.close()
+    connection.close()
+    return True
 
 if __name__ == '__main__' :
-    update_support_status(1 , 1 , 1 , 'alieke salam')
+    add_teacher_with_tel_id(1454840970)
     #print(add_categories('structure'))
 
