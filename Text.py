@@ -7,7 +7,7 @@ text = {
     'support_answered'          : 'پاسخ با موفقیت برای کاربر ارسال شد',
     'support_another_admin'     : 'این پیام توسط ادمین دیگر پاسخ داده شد',
     'hidden_user_reply'         : 'امکان ارسال پیام وجود ندارد، از دکمه پاسخ استفاده نمایید',
-    'quiz_creating_command'     : 'ساخت کوئیز',
+    'quiz_creating_command'     : 'شروع کوئیز',
     'show_categories'           : 'مشاهده موضوعات',
     'add_question_teacher'      : 'اضافه کردن یک سوال',
     'add_teacher_admin'         : 'اضافه کردن معلم',
@@ -26,6 +26,17 @@ text = {
     'request_teacher'           : 'دسترسی طراحی سوال و آزمون',
     'buttons_choice'            : 'می توانید گزینه های زیر را انتخاب نمایید',
     'user_teacher_added'        : 'کاربر تایید صلاحیت شده است',
+    'category_choice_callanswe' : 'موضوع انتخاب شد',
+    'options'                   : 'گزینه ها ',
+    'get_answer_for_question'   : 'مشاهده پاسخ 💡',
+    'delete_answer_text_photo'  : 'پاک کردن پاسخ ⚠️'
+}
+
+option_sticker = {
+    '1' : '1️⃣',
+    '2' : '2️⃣',
+    '3' : '3️⃣',
+    '4' : '4️⃣',
 }
 
 Button = {

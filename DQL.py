@@ -21,6 +21,20 @@ def get_user_information(telegram_id):
     connection.close()
     return result
 
+def get_question_information(question_id) :
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor(dictionary=True)
+    SQL_QUERY = '''
+        SELECT text,photo_id,answer_text,answer_option,option_1,option_2,option_3,option_4 
+        FROM questions
+        WHERE id = (%s)
+    '''
+    cur.execute(SQL_QUERY , (question_id ,))
+    result = cur.fetchone()
+    cur.close()
+    connection.close()
+    return result
+
 def get_is_teacher_status(telegram_id) :
     connection = mysql.connector.connect(**config , database = database_name)
     cur = connection.cursor(dictionary=True)
@@ -65,5 +79,18 @@ def get_support_status(user_id , user_mid) :
     connection.close()
     return result
 
+def get_question_id_public(category_id): # output : list
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor(dictionary=True)
+    SQL_QUERY = 'SELECT ID FROM questions WHERE `is_public` = 1 and `category_id` = (%s)'
+    cur.execute(SQL_QUERY , (category_id , ))
+    result = cur.fetchall()
+    for i in range(len(result)) : 
+        value = result[i]['ID']
+        result[i] = value
+    cur.close()
+    connection.close()
+    return result
+
 if __name__ == '__main__':
-    print(get_is_teacher_status(1454840970))
+    print(get_question_information(2))

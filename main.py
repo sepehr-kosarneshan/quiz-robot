@@ -5,6 +5,7 @@ from config_bot import *
 from config_db import *
 import os
 import datetime,time
+import random
 from Text import *
 from DQL import *
 from DML import *
@@ -15,6 +16,7 @@ setup_proxy(
 
 bot = telebot.TeleBot(telegram_token , threaded= 5)
 hide_board = ReplyKeyboardRemove()
+
 #print(f'{os.getcwd()}')
 
 channel_id = -1004392460681 #messages
@@ -25,7 +27,7 @@ command = {
     '/support'          : text['support_command'],
     '/quiz'             : text['quiz_creating_command'],
     '/showcategory'     : text['show_categories'],
-    '/reqteach'   : text['request_teacher'],
+    '/reqteach'         : text['request_teacher'],
 }
 teacher_commands = {
     '/addquestion' : text['add_question_teacher'],
@@ -57,6 +59,8 @@ spam_data = {}
 teachers = []
 admins = []
 
+question_count = 1 # for public quiz
+
 def get_admins():
     global admins
     data = get_users()
@@ -87,6 +91,7 @@ def set_name(first_name , last_name) :
 def manage_user(message , cid): 
     global admins
     global teachers
+    print('teachers : ' , teachers , sep = ' : ')
     data = get_users()
     first_name = message.from_user.first_name
     last_name = message.from_user.last_name
@@ -98,12 +103,13 @@ def manage_user(message , cid):
             edit_user_name(cid , name)
             if (user['is_admin'] == 1) and (cid not in admins):
                 admins.append(cid)
-            if user['is_admin'] == 0:
+            elif user['is_admin'] == 0:
                 if user['telegram_id'] in admins:
                     admins.remove(user['telegram_id'])
             if (user['is_teacher'] == 1) and (cid not in teachers):
                 teachers.append(cid)
-            if user['is_teacher'] == 0:
+            elif user['is_teacher'] == 0:
+                print('hello is teacher = 0')
                 if user['telegram_id'] in teachers :
                     teachers.remove(user['telegram_id'])
             break
@@ -183,8 +189,33 @@ def create_inlinekeyboard_for_categoris(clist , page) : # clist : DQL.get_catego
         markup = InlineKeyboardMarkup()
         for i in range(len(categories)):
             markup.add(InlineKeyboardButton(f'{categories[i]['NAME']}' , callback_data=f'categorychoice_{categories[i]['ID']}'))
-        markup.add(InlineKeyboardButton('◀️' , callback_data=f'changepage_{page - 1}') , \
-                   InlineKeyboardButton('▶️' , callback_data=f'changepage_{page + 1}'))
+        left_button = InlineKeyboardButton('◀️' , callback_data=f'changepage_{page - 1}')
+        right_button = InlineKeyboardButton('▶️' , callback_data=f'changepage_{page + 1}')
+        if page == len(category_pages_list) - 1:
+            markup.add(left_button)
+        elif page == 0 : 
+            markup.add(right_button)
+        else :
+            markup.add(left_button , right_button)
+        return markup
+    else :
+        return False
+
+def create_inlinekeyboard_for_categoris_quizmaking(clist , page) : # clist : DQL.get_categories() and page starts from 0
+    category_pages_list = category_pages(clist)
+    if 0<= page <= len(category_pages_list) - 1 :
+        categories = category_pages_list[page]
+        markup = InlineKeyboardMarkup()
+        for i in range(len(categories)):
+            markup.add(InlineKeyboardButton(f'{categories[i]['NAME']}' , callback_data=f'quizcatchoice_{categories[i]['ID']}'))
+        left_button = InlineKeyboardButton('◀️' , callback_data=f'chpagequiz_{page - 1}')
+        right_button = InlineKeyboardButton('▶️' , callback_data=f'chpagequiz_{page + 1}')
+        if page == len(category_pages_list) - 1:
+            markup.add(left_button)
+        elif page == 0 : 
+            markup.add(right_button)
+        else :
+            markup.add(left_button , right_button)
         return markup
     else :
         return False
@@ -212,6 +243,74 @@ def create_inlinekeyboard_for_teacher_request(cid , mid , answer = True , addtea
     button3 = InlineKeyboardButton('Show Information' , callback_data= f'reqteach_si_{cid}|{mid}_{status}')
     markup.add(button3)
     return markup
+
+def create_list_quiz_public(category_id , question_count): # random , output : list of id(s)
+    list_of_ids = get_question_id_public(category_id=category_id)
+    try :
+        list_of_ids = random.sample(list_of_ids , k = question_count)
+    except :
+        return False
+    return list_of_ids
+
+def create_inline_for_answered_option(user_choice ,correct_option , question_id , mid):
+    markup = InlineKeyboardMarkup()
+    options = ['1' , '2' , '3' , '4']
+    for i in range(len(options)):
+        if options[i] == str(user_choice) and options[i] == str(correct_option):
+            options[i] += 'uc'
+        elif options[i] == str(correct_option) :
+            options[i] += 'c'
+        elif options[i] == str(user_choice) :
+            options[i] += 'u'
+    for i in range(len(options)):
+        if 'uc' in options[i]:
+            text_option = option_sticker[str(options[i][0])]
+            markup.add(InlineKeyboardButton(text_option , callback_data='None' , style='success'))
+        elif 'u' in options[i]:
+            text_option = option_sticker[str(options[i][0])]
+            markup.add(InlineKeyboardButton(text_option , callback_data='None' , style= 'danger'))
+        elif 'c' in options[i] :
+            text_option = option_sticker[str(options[i][0])]
+            markup.add(InlineKeyboardButton(text_option , callback_data='None' , style= 'success'))
+        else :
+            text_option = option_sticker[str(options[i][0])]
+            markup.add(InlineKeyboardButton(text_option , callback_data='None'))
+    markup.add(InlineKeyboardButton(text['get_answer_for_question'] , callback_data=f'getanswer_{mid}_{question_id}' , style='primary'))
+    return markup
+    
+def create_inline_for_options(question_id):
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton(option_sticker['1'] , callback_data = f'option_1_{question_id}'))
+    markup.add(InlineKeyboardButton(option_sticker['2'] , callback_data = f'option_2_{question_id}'))
+    markup.add(InlineKeyboardButton(option_sticker['3'] , callback_data = f'option_3_{question_id}'))
+    markup.add(InlineKeyboardButton(option_sticker['4'] , callback_data = f'option_4_{question_id}'))
+    return markup
+
+def create_text_caption_for_question(question_id):
+    info = get_question_information(question_id=question_id)
+    question_text = info['text']
+    option_1 = info['option_1']
+    option_2 = info['option_2']
+    option_3 = info['option_3']
+    option_4 = info['option_4']
+    result = question_text + '\n\n'
+    result += '✅' + text['options'] + '✅' + '\n\n'
+    result += f'{option_sticker['1']} : {option_1}\n\n'
+    result += f'{option_sticker['2']} : {option_2}\n\n'
+    result += f'{option_sticker['3']} : {option_3}\n\n'
+    result += f'{option_sticker['4']} : {option_4}\n'
+    return result
+
+def send_question(cid , question_id):
+    info = get_question_information(question_id=question_id)
+    photo_id = info['photo_id']
+    markup = create_inline_for_options(question_id=question_id)
+    result = create_text_caption_for_question(question_id=question_id)
+    if photo_id is not None : 
+        bot.send_photo(cid , photo_id , caption=result , reply_markup=markup)
+    else :
+        bot.send_message(cid , result , reply_markup=markup)
+    return True
 
 # ----------------------------------
 
@@ -328,6 +427,65 @@ def callback_handler(call):
                 pass
                 #print(f'{e}')
             bot.answer_callback_query(call_id , 'show information')
+    
+    elif data.startswith('quizcatchoice'):
+        _,category_id = data.split('_')
+        category_id = int(category_id)
+        list_id = create_list_quiz_public(category_id=category_id , question_count=question_count)
+        for i in list_id : 
+            send_question(cid , i)
+        bot.answer_callback_query(call_id , text['category_choice_callanswe'])
+
+    elif data.startswith('chpagequiz'):
+        _,page = data.split('_')
+        page = int(page)
+        data = get_categories()
+        new_markup = create_inlinekeyboard_for_categoris_quizmaking(data , page)
+        if new_markup : 
+            bot.edit_message_reply_markup(cid , mid , reply_markup=new_markup)
+            bot.answer_callback_query(call_id , f'page {page+1}')
+        else :
+            bot.answer_callback_query(call_id , 'wrong buuton')
+
+    elif data.startswith('option'):
+        _,user_option,question_id = data.split('_')
+        user_option = int(user_option)
+        question_id = int(question_id)
+        info = get_question_information(question_id=question_id)
+        correct_option = info['answer_option']
+
+        # data base DML here ...
+
+        new_markup = create_inline_for_answered_option(user_option , correct_option , question_id , mid)
+        bot.edit_message_reply_markup(cid , mid , reply_markup = new_markup)
+    elif data.startswith('getanswer'):
+        _,mid,qid = data.split('_')
+        mid = int(mid)
+        qid = int(qid)
+        info = get_question_information(question_id=qid)
+        answer_photo = None
+        answer_text = None
+        if info['answer_text'].startswith('isphoto_'):
+            _,photo_id = info['answer_text'].split('_')
+            answer_photo =  photo_id
+        else :
+            answer_text = info['answer_text'] 
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton(text['delete_answer_text_photo'] , callback_data='deleteans'))
+        if answer_text is not None:
+            bot.send_message(cid , answer_text , reply_to_message_id=mid , reply_markup=markup)
+        else :
+            bot.send_photo(cid , answer_photo , reply_to_message_id=mid , reply_markup=markup)
+        bot.answer_callback_query(call_id , 'answer')
+
+    elif data == 'deleteans' : 
+        bot.delete_message(cid , mid)
+        bot.answer_callback_query(call_id , 'message deleted')
+
+    elif data == 'None' :
+        bot.answer_callback_query(call_id , 'None')
+    
+
 
 @bot.message_handler(func=lambda m: m.text in ['/start', Button['start']])
 def start_command_handler(message):
@@ -338,7 +496,7 @@ def start_command_handler(message):
     print(admins)
     markup = create_start_keyboard(cid)
     bot.copy_message(cid , channel_id , channel_messages['start'] , reply_markup = markup)
-    bot.send_message(cid , show_commands(cid) , parse_mode='MarkdownV2')
+    #bot.send_message(cid , show_commands(cid) , parse_mode='MarkdownV2')
 
 @bot.message_handler(func=lambda m: m.text in ['/help', Button['help']])
 def start_command_handler(message):
@@ -399,9 +557,9 @@ def quiz_command_handler(message):
     if is_spam(cid) : 
         return 
     manage_user(message , cid)
-    bot.send_message(cid , 'request for quiz')
-    # ........ data base 
-    # Working here ...
+    data = get_categories()
+    markup = create_inlinekeyboard_for_categoris_quizmaking(data , 0)
+    bot.send_message(cid , 'request for quiz' , reply_markup=markup) # Working here ...
 
 @bot.message_handler(func=lambda m: m.text in ['/support', Button['support']]) 
 def support_command_handler(message):
@@ -435,6 +593,8 @@ def add_category_admin(message):
         return 
     manage_user(message , cid)
     if (cid not in teachers) and (cid not in admins):
+        markup = create_start_keyboard(cid)
+        bot.copy_message(cid , channel_id , channel_messages['help'] , reply_markup=markup)
         return 
     bot.send_message(cid , text['add_category_admin'])
     user_step[cid] = 'getting_category_name'
@@ -458,6 +618,8 @@ def choice_category_handler(message):
         return
     manage_user(message , cid)
     if (cid not in teachers) and (cid not in admins):
+        markup = create_start_keyboard(cid)
+        bot.copy_message(cid , channel_id , channel_messages['help'] , reply_markup=markup)
         return 
     data = get_categories()
     markup = create_inlinekeyboard_for_categoris(data , 0)
@@ -571,7 +733,7 @@ def get_option1_handler(message):
         file_list = message.photo
         photo = file_list[-1]
         file_id = photo.file_id
-        admin_question[cid].serdefault('text_answer' , file_id)
+        admin_question[cid].setdefault('text_answer' , 'isphoto_' + file_id)
     print(admin_question)
     user_id_in_table = find_user_id(cid)
     add_question(   category_id = category_id,
@@ -633,4 +795,5 @@ def every_messages_handler(message):
 get_admins()
 get_teachers()
 print('bot is running !')
-bot.infinity_polling(skip_pending=True)
+#skip_pending=True
+bot.infinity_polling()

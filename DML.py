@@ -90,6 +90,7 @@ def update_support_status(user_id , user_mid , admin_id , admin_text) :
     cur.close()
     connection.close()
     return True
+
 def add_teacher_with_tel_id(telegram_id) :
     connection = mysql.connector.connect(**config , database = database_name)
     cur = connection.cursor()
