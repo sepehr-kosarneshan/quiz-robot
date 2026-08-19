@@ -92,5 +92,29 @@ def get_question_id_public(category_id): # output : list
     connection.close()
     return result
 
+def is_answered_this_question(user_id , question_id):
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor(dictionary=True)
+    SQL_QUERY = 'SELECT `id` FROM user_answers WHERE `user_id` = (%s) AND `question_id` = (%s)'
+    cur.execute(SQL_QUERY , (user_id , question_id))
+    result = cur.fetchone()
+    cur.close()
+    connection.close()
+    return result
+
+def find_designer_telegram_id(question_id): # who added this question (question_id) ??
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor(dictionary=True)
+    SQL_QUERY = '''
+            SELECT Q.ID AS `question_id`,U.telegram_id FROM questions AS Q INNER JOIN users AS U ON Q.designer_id = U.id WHERE Q.ID = (%s);
+    ''' 
+    cur.execute(SQL_QUERY , (question_id , ))
+    result = cur.fetchone()
+    cur.close()
+    connection.close()
+    return result['telegram_id']
+
 if __name__ == '__main__':
-    print(get_question_information(2))
+    print(find_designer_telegram_id(2))
+    # print(is_answered_this_question(2 , 2))
+    #  print(get_question_information(2))

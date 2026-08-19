@@ -19,7 +19,7 @@ hide_board = ReplyKeyboardRemove()
 
 #print(f'{os.getcwd()}')
 
-channel_id = -1004392460681 #messages
+CHANNEL_ID = -1004392460681 #messages
 
 command = {
     '/start'            : text['start_command'],
@@ -37,14 +37,31 @@ teacher_commands = {
 admin_commands = {
 }
 
-channel_messages = {
+CHANNEL_MESSAGES = {
     'start'             : 2,
     'help'              : 4,
     'req_support'       : 6,
     'sended_support'    : 8,
     'teacher_request'   : 10,
     'you_added_teacher' : 12,
+    'request_for_quiz'  : 14,
+    'quesiton_report'   : 16,
 }
+
+EDIT_QUESTION_PAGES = [
+    #page 0
+    [{'button_text' : text['edit_question_categoty'] , 'data' : 'editquestion_category_'},\
+    {'button_text' : text['edit_question_text'] , 'data' : 'editquestion_text_'},\
+    {'button_text' : text['edit_question_photo_id'] , 'data' : 'editquestion_photo_'},\
+    {'button_text' : text['edit_question_anstext'] , 'data' : 'editquestion_anstext_'},\
+    {'button_text' : text['edit_question_ansop'] , 'data' : 'editquestion_ansop_'}],
+    #page 1
+    [{'button_text' : text['edit_question_op1'] , 'data' : 'editquestion_op1_'},\
+    {'button_text' : text['edit_question_op2'] , 'data' : 'editquestion_op2_'},\
+    {'button_text' : text['edit_question_op3'] , 'data' : 'editquestion_op3_'},\
+    {'button_text' : text['edit_question_op4'] , 'data' : 'editquestion_op4_'},\
+    {'button_text' : text['end_edit_question'] , 'data' : 'editquestion_end_'}]
+]
 
 user_step = {}
 admin_question = {} # cid : {text : ... , file_id : ... , options : ... , answer_option : ... , answer_text : ...}
@@ -189,8 +206,8 @@ def create_inlinekeyboard_for_categoris(clist , page) : # clist : DQL.get_catego
         markup = InlineKeyboardMarkup()
         for i in range(len(categories)):
             markup.add(InlineKeyboardButton(f'{categories[i]['NAME']}' , callback_data=f'categorychoice_{categories[i]['ID']}'))
-        left_button = InlineKeyboardButton('◀️' , callback_data=f'changepage_{page - 1}')
-        right_button = InlineKeyboardButton('▶️' , callback_data=f'changepage_{page + 1}')
+        left_button = InlineKeyboardButton('◀️' , callback_data=f'changepageshowcat_{page - 1}')
+        right_button = InlineKeyboardButton('▶️' , callback_data=f'changepageshowcat_{page + 1}')
         if page == len(category_pages_list) - 1:
             markup.add(left_button)
         elif page == 0 : 
@@ -207,9 +224,28 @@ def create_inlinekeyboard_for_categoris_quizmaking(clist , page) : # clist : DQL
         categories = category_pages_list[page]
         markup = InlineKeyboardMarkup()
         for i in range(len(categories)):
-            markup.add(InlineKeyboardButton(f'{categories[i]['NAME']}' , callback_data=f'quizcatchoice_{categories[i]['ID']}'))
+            markup.add(InlineKeyboardButton(f'{categories[i]['NAME']}' , callback_data=f'quizmakingcatchoice_{categories[i]['ID']}'))
         left_button = InlineKeyboardButton('◀️' , callback_data=f'chpagequiz_{page - 1}')
         right_button = InlineKeyboardButton('▶️' , callback_data=f'chpagequiz_{page + 1}')
+        if page == len(category_pages_list) - 1:
+            markup.add(left_button)
+        elif page == 0 : 
+            markup.add(right_button)
+        else :
+            markup.add(left_button , right_button)
+        return markup
+    else :
+        return False
+
+def create_inlinekeyboard_for_categoris_editques(clist , page , qid) : # clist : DQL.get_categories() and page starts from 0
+    category_pages_list = category_pages(clist)
+    if 0<= page <= len(category_pages_list) - 1 :
+        categories = category_pages_list[page]
+        markup = InlineKeyboardMarkup()
+        for i in range(len(categories)):
+            markup.add(InlineKeyboardButton(f'{categories[i]['NAME']}' , callback_data=f'editquestioncateg_{categories[i]['ID']}_{qid}'))
+        left_button = InlineKeyboardButton('◀️' , callback_data=f'chpageeditques_{page - 1}_{qid}')
+        right_button = InlineKeyboardButton('▶️' , callback_data=f'chpageeditques_{page + 1}_{qid}')
         if page == len(category_pages_list) - 1:
             markup.add(left_button)
         elif page == 0 : 
@@ -276,6 +312,7 @@ def create_inline_for_answered_option(user_choice ,correct_option , question_id 
             text_option = option_sticker[str(options[i][0])]
             markup.add(InlineKeyboardButton(text_option , callback_data='None'))
     markup.add(InlineKeyboardButton(text['get_answer_for_question'] , callback_data=f'getanswer_{mid}_{question_id}' , style='primary'))
+    markup.add(InlineKeyboardButton(text['delete_question'] , callback_data=f'deletequestion'))
     return markup
     
 def create_inline_for_options(question_id):
@@ -284,6 +321,7 @@ def create_inline_for_options(question_id):
     markup.add(InlineKeyboardButton(option_sticker['2'] , callback_data = f'option_2_{question_id}'))
     markup.add(InlineKeyboardButton(option_sticker['3'] , callback_data = f'option_3_{question_id}'))
     markup.add(InlineKeyboardButton(option_sticker['4'] , callback_data = f'option_4_{question_id}'))
+    markup.add(InlineKeyboardButton(text['delete_question'] , callback_data=f'deletequestion'))
     return markup
 
 def create_text_caption_for_question(question_id):
@@ -301,16 +339,30 @@ def create_text_caption_for_question(question_id):
     result += f'{option_sticker['4']} : {option_4}\n'
     return result
 
+def create_inline_for_edit_question(question_id , page): # page 0 or 1
+    markup = InlineKeyboardMarkup()
+    # markup.add(InlineKeyboardButton(text['edit_question_categoty']  , callback_data=f'editquestion_category_{question_id}'))
+    list_of_buttons = EDIT_QUESTION_PAGES[page]
+    for i in range(len(list_of_buttons)):
+        markup.add(InlineKeyboardButton(list_of_buttons[i]['button_text'] , callback_data = list_of_buttons[i]['data'] + f'{question_id}'))
+    if page == 0 :
+        markup.add(InlineKeyboardButton( '▶️', callback_data = f'editqpage_1_{question_id}'))
+    elif page == 1:
+        markup.add(InlineKeyboardButton( '◀️', callback_data = f'editqpage_0_{question_id}'))
+    else :
+        return False
+    return markup
+
 def send_question(cid , question_id):
     info = get_question_information(question_id=question_id)
     photo_id = info['photo_id']
     markup = create_inline_for_options(question_id=question_id)
     result = create_text_caption_for_question(question_id=question_id)
     if photo_id is not None : 
-        bot.send_photo(cid , photo_id , caption=result , reply_markup=markup)
+        message = bot.send_photo(cid , photo_id , caption=result , reply_markup=markup)
     else :
-        bot.send_message(cid , result , reply_markup=markup)
-    return True
+        message = bot.send_message(cid , result , reply_markup=markup)
+    return message
 
 # ----------------------------------
 
@@ -358,7 +410,7 @@ def callback_handler(call):
         print(user_step)
 
     # categories
-    elif data.startswith('changepage'):
+    elif data.startswith('changepageshowcat'):
         _,new_page = data.split('_')
         new_page = int(new_page)
         clist = get_categories()
@@ -370,8 +422,7 @@ def callback_handler(call):
             bot.answer_callback_query(call_id , f'wrong button')
 
     # add teacher process
-    #reqteach_ans_{cid}|{mid}
-
+    
     elif data.startswith('reqteach'):
         _,status,info,inlinestatus = data.split('_')
         user_cid,user_mid = info.split('|')
@@ -400,7 +451,7 @@ def callback_handler(call):
                 add_teacher_with_tel_id(user_cid)
                 teachers.append(user_cid)
                 keyboard = create_start_keyboard(user_cid)
-                bot.copy_message(user_cid , channel_id , channel_messages['you_added_teacher'] , reply_to_message_id=user_mid , reply_markup=keyboard)
+                bot.copy_message(user_cid , CHANNEL_ID , CHANNEL_MESSAGES['you_added_teacher'] , reply_to_message_id=user_mid , reply_markup=keyboard)
                 bot.send_message(cid , f'{user_cid} added to teachers')
                 bot.edit_message_reply_markup(cid , mid , reply_markup= new_markup)
                 bot.answer_callback_query(call_id , 'user added to teachers')
@@ -428,7 +479,7 @@ def callback_handler(call):
                 #print(f'{e}')
             bot.answer_callback_query(call_id , 'show information')
     
-    elif data.startswith('quizcatchoice'):
+    elif data.startswith('quizmakingcatchoice'):
         _,category_id = data.split('_')
         category_id = int(category_id)
         list_id = create_list_quiz_public(category_id=category_id , question_count=question_count)
@@ -453,11 +504,14 @@ def callback_handler(call):
         question_id = int(question_id)
         info = get_question_information(question_id=question_id)
         correct_option = info['answer_option']
-
-        # data base DML here ...
+        user_id_dict = find_user_id(cid)
+        user_id = user_id_dict['ID']
+        if is_answered_this_question(user_id=user_id , question_id=question_id) is None:
+            add_answer_for_question(user_id=user_id , question_id = question_id , selected_option=user_option)
 
         new_markup = create_inline_for_answered_option(user_option , correct_option , question_id , mid)
         bot.edit_message_reply_markup(cid , mid , reply_markup = new_markup)
+
     elif data.startswith('getanswer'):
         _,mid,qid = data.split('_')
         mid = int(mid)
@@ -465,27 +519,123 @@ def callback_handler(call):
         info = get_question_information(question_id=qid)
         answer_photo = None
         answer_text = None
-        if info['answer_text'].startswith('isphoto_'):
-            _,photo_id = info['answer_text'].split('_')
+        if info['answer_text'].startswith('isphoto'):
+            photo_id = info['answer_text'][7:]
             answer_photo =  photo_id
         else :
             answer_text = info['answer_text'] 
         markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton(text['delete_answer_text_photo'] , callback_data='deleteans'))
+        markup.add(InlineKeyboardButton(text['delete_answer_text_photo'], callback_data='deleteans'))
+        # if find_designer_telegram_id(qid) != cid:
+        markup.add(InlineKeyboardButton(text['report_question_designer'], callback_data=f'reportques_{qid}'))
         if answer_text is not None:
             bot.send_message(cid , answer_text , reply_to_message_id=mid , reply_markup=markup)
         else :
             bot.send_photo(cid , answer_photo , reply_to_message_id=mid , reply_markup=markup)
         bot.answer_callback_query(call_id , 'answer')
 
+    elif data.startswith('reportques') : 
+        _,qid = data.split('_')
+        qid = int(qid)
+        designer_cid = find_designer_telegram_id(qid)
+        user_step.setdefault(cid , '')
+        user_step[cid] = f'reportwrongqa_{qid}_{designer_cid}'
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton(text['delete_answer_text_photo'] , callback_data='deleteans'))
+        bot.edit_message_reply_markup(cid , mid , reply_markup=markup)
+        bot.send_message(cid , text['report_wrong_question'])
+        bot.answer_callback_query(call_id , 'report question')
+
+    elif data.startswith('chpageeditques'):
+        _,new_page,qid = data.split('_')
+        new_page = int(new_page)
+        qid = int(qid)
+        data = get_categories()
+        new_markup = create_inlinekeyboard_for_categoris_editques(data , new_page , qid)
+        if new_markup : 
+            bot.edit_message_reply_markup(cid , mid , reply_markup=new_markup)
+            bot.answer_callback_query(call_id , f'page changed')
+        else :
+            bot.answer_callback_query(call_id , 'wrong buuton')
+
+    elif data.startswith('editquestioncateg'): 
+        _,category_id,qid = data.split('_')
+        category_id = int(category_id)
+        qid = int(qid)
+        edit_question_category(qid , category_id)
+        bot.send_message(cid , text['edited_successfully'])
+        bot.delete_message(cid , mid)
+
+    elif data.startswith('editquestion') :
+        _,mode,qid = data.split('_')
+        if mode == 'category':
+            data = get_categories()
+            markup = create_inlinekeyboard_for_categoris_editques(data , 0 , qid)
+            bot.send_message(cid , text['get_new_category'] , reply_markup=markup)
+            bot.answer_callback_query(call_id,'choice category')
+        elif mode == 'text':
+            user_step.setdefault(cid , '')
+            user_step[cid] = f'getnewtext_{qid}'
+            bot.send_message(cid , text['get_new_text'])
+            bot.answer_callback_query(call_id , 'get new text')
+        elif mode == 'photo':
+            user_step.setdefault(cid , '')
+            user_step[cid] = f'getnewphoto_{qid}'
+            bot.send_message(cid , text['get_new_photo'])
+            bot.answer_callback_query(call_id , 'get new photo')
+        elif mode == 'anstext':
+            user_step.setdefault(cid , '')
+            user_step[cid] = f'getnewanstext_{qid}'
+            bot.send_message(cid , text['get_new_ans_text'])
+            bot.answer_callback_query(call_id , 'get new answer')
+        elif mode == 'ansop':
+            user_step.setdefault(cid , '')
+            user_step[cid] = f'getnewansop_{qid}'
+            bot.send_message(cid , text['get_new_ans_option'])
+            bot.answer_callback_query(call_id , 'get new answer option')
+        elif mode == 'op1':
+            user_step.setdefault(cid , '')
+            user_step[cid] = f'getnewop_1_{qid}'
+            bot.send_message(cid , text['get_new_option'])
+            bot.answer_callback_query(call_id , 'get new option')
+        elif mode == 'op2':
+            user_step.setdefault(cid , '')
+            user_step[cid] = f'getnewop_2_{qid}'
+            bot.send_message(cid , text['get_new_option'])
+            bot.answer_callback_query(call_id , 'get new option')       
+        elif mode == 'op3':
+            user_step.setdefault(cid , '')
+            user_step[cid] = f'getnewop_3_{qid}'
+            bot.send_message(cid , text['get_new_option'])
+            bot.answer_callback_query(call_id , 'get new option')
+        elif mode == 'op4':
+            user_step.setdefault(cid , '')
+            user_step[cid] = f'getnewop_4_{qid}'
+            bot.send_message(cid , text['get_new_option'])
+            bot.answer_callback_query(call_id , 'get new option')
+        elif mode == 'end' :
+            bot.delete_message(cid , mid)
+            bot.answer_callback_query(call_id , 'message deleted')
+
+    elif data.startswith('editqpage'):
+        _,new_page,qid = data.split('_')
+        new_page = int(new_page)
+        qid = int(qid)
+        new_markup = create_inline_for_edit_question(qid , new_page)
+        bot.edit_message_reply_markup(cid , mid , reply_markup=new_markup)
+        bot.answer_callback_query(call_id , 'page changed')
+
     elif data == 'deleteans' : 
         bot.delete_message(cid , mid)
         bot.answer_callback_query(call_id , 'message deleted')
 
+    elif data == 'deletequestion' :
+        bot.delete_message(cid , mid)
+        bot.answer_callback_query(call_id , 'question deleted')
+        
     elif data == 'None' :
         bot.answer_callback_query(call_id , 'None')
     
-
 
 @bot.message_handler(func=lambda m: m.text in ['/start', Button['start']])
 def start_command_handler(message):
@@ -495,7 +645,7 @@ def start_command_handler(message):
     manage_user(message , cid)
     print(admins)
     markup = create_start_keyboard(cid)
-    bot.copy_message(cid , channel_id , channel_messages['start'] , reply_markup = markup)
+    bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['start'] , reply_markup = markup)
     #bot.send_message(cid , show_commands(cid) , parse_mode='MarkdownV2')
 
 @bot.message_handler(func=lambda m: m.text in ['/help', Button['help']])
@@ -505,7 +655,7 @@ def start_command_handler(message):
         return 
     manage_user(message , cid)
     markup = create_start_keyboard(cid)
-    bot.copy_message(cid , channel_id , channel_messages['help'] , reply_markup = markup)
+    bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['help'] , reply_markup = markup)
     bot.send_message(cid , show_commands(cid) , parse_mode='MarkdownV2')
 
 # Teacher Request ------------------------------------
@@ -516,7 +666,7 @@ def request_teacher_command_handler(message):
     if is_spam(cid) :
         return 
     manage_user(message , cid)
-    bot.copy_message(cid , channel_id , channel_messages['teacher_request'])
+    bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['teacher_request'])
     user_step.setdefault(cid , '')
     user_step[cid] = 'teacher_request_info'
 
@@ -531,7 +681,7 @@ def information_receive_handler(message):
     for i in range(len(admins)):
         bot.forward_message(admins[i] , cid , mid)
         bot.send_message(admins[i] , text['buttons_choice'] , reply_markup = markup)
-    bot.copy_message(cid , channel_id , channel_messages['sended_support'])
+    bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['sended_support'])
     user_step.pop(cid)
 
 @bot.message_handler(content_types=['text' , 'photo'] , func = lambda m : user_step.get(m.chat.id , '_').startswith('teachreqans'))
@@ -559,7 +709,7 @@ def quiz_command_handler(message):
     manage_user(message , cid)
     data = get_categories()
     markup = create_inlinekeyboard_for_categoris_quizmaking(data , 0)
-    bot.send_message(cid , 'request for quiz' , reply_markup=markup) # Working here ...
+    bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['request_for_quiz'] , reply_markup= markup) # Working here ...
 
 @bot.message_handler(func=lambda m: m.text in ['/support', Button['support']]) 
 def support_command_handler(message):
@@ -567,7 +717,7 @@ def support_command_handler(message):
     if is_spam(cid) : 
         return 
     manage_user(message , cid)
-    bot.copy_message(cid , channel_id , channel_messages['req_support'])
+    bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['req_support'])
     user_step.setdefault(cid , '')
     user_step[cid] = 'support_request'
 
@@ -594,7 +744,7 @@ def add_category_admin(message):
     manage_user(message , cid)
     if (cid not in teachers) and (cid not in admins):
         markup = create_start_keyboard(cid)
-        bot.copy_message(cid , channel_id , channel_messages['help'] , reply_markup=markup)
+        bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['help'] , reply_markup=markup)
         return 
     bot.send_message(cid , text['add_category_admin'])
     user_step[cid] = 'getting_category_name'
@@ -619,7 +769,7 @@ def choice_category_handler(message):
     manage_user(message , cid)
     if (cid not in teachers) and (cid not in admins):
         markup = create_start_keyboard(cid)
-        bot.copy_message(cid , channel_id , channel_messages['help'] , reply_markup=markup)
+        bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['help'] , reply_markup=markup)
         return 
     data = get_categories()
     markup = create_inlinekeyboard_for_categoris(data , 0)
@@ -733,7 +883,7 @@ def get_option1_handler(message):
         file_list = message.photo
         photo = file_list[-1]
         file_id = photo.file_id
-        admin_question[cid].setdefault('text_answer' , 'isphoto_' + file_id)
+        admin_question[cid].setdefault('text_answer' , 'isphoto' + file_id)
     print(admin_question)
     user_id_in_table = find_user_id(cid)
     add_question(   category_id = category_id,
@@ -745,10 +895,114 @@ def get_option1_handler(message):
                     op3         = admin_question[cid]['option3'],
                     op4         = admin_question[cid]['option4'],
                     ansop       = admin_question[cid]['option_answer'],
-                    anstext     = admin_question[cid]['text_answer'])
+                    anstext     = admin_question[cid]['text_answer'] )
     
     bot.send_message(cid , text['questoin_added'])
     admin_question.pop(cid)
+    user_step.pop(cid)
+
+
+# -------------------------------------------- report Question
+# f'reportwrongqa_{designer_cid}'
+@bot.message_handler(func = lambda m : user_step.get(m.chat.id , '_').startswith('reportwrongqa'))
+def report_question_handler(message):
+    cid = message.chat.id
+    step = user_step[cid]
+    _,question_id,designer_cid = step.split('_')
+    designer_cid = int(designer_cid)
+    question_id = int(question_id)
+    bot.copy_message(designer_cid , CHANNEL_ID , CHANNEL_MESSAGES['quesiton_report'])
+    sent_msg = send_question(designer_cid , question_id)
+    sent_msg_id = sent_msg.message_id
+    markup = create_inline_for_edit_question(question_id , 0)
+    bot.copy_message(designer_cid , cid , message.message_id , reply_to_message_id=sent_msg_id , reply_markup=markup)
+    bot.send_message(cid , text['report_wrong_question_sended'])
+    user_step.pop(cid)
+
+@bot.message_handler(func = lambda m : user_step.get(m.chat.id , '_').startswith('getnewtext'))
+def get_new_text_handler(message):
+    cid = message.chat.id
+    if is_spam(cid) : 
+        return
+    manage_user(message , cid)
+    step = user_step[cid]
+    _,qid = step.splut('_')
+    qid = int(qid)
+    edit_question_text(qid , message.text)
+    bot.send_message(cid , text['edited_successfully'])
+    user_step.pop(cid)
+
+@bot.message_handler(content_types=['photo'], func = lambda m : user_step.get(m.chat.id , '_').startswith('getnewphoto'))
+def get_new_text_handler(message):
+    cid = message.chat.id
+    if is_spam(cid) : 
+        return
+    manage_user(message , cid)
+    step = user_step[cid]
+    _,qid = step.split('_')
+    qid = int(qid)
+    file_list = message.photo
+    photo = file_list[-1]
+    file_id = photo.file_id
+    edit_question_photo_id(question_id=qid , new_photo_id=file_id)
+    bot.send_message(cid , text['edited_successfully'])
+    user_step.pop(cid)
+
+# getnewanstext
+@bot.message_handler(content_types=['text','photo'], func = lambda m : user_step.get(m.chat.id , '_').startswith('getnewanstext'))
+def get_new_text_handler(message):
+    cid = message.chat.id
+    if is_spam(cid) : 
+        return
+    manage_user(message , cid)
+    step = user_step[cid]
+    _,qid = step.split('_')
+    qid = int(qid)
+    if message.content_type == 'photo':
+        file_list = message.photo
+        photo = file_list[-1]
+        file_id = photo.file_id
+        edit_question_answer_text(qid , 'isphoto' + file_id)
+    else :
+        edit_question_answer_text(qid , message.text)
+
+    bot.send_message(cid , text['edited_successfully'])
+    user_step.pop(cid)
+
+@bot.message_handler(func = lambda m : user_step.get(m.chat.id , '_').startswith('getnewansop'))
+def get_new_text_handler(message):
+    cid = message.chat.id
+    if is_spam(cid) : 
+        return
+    manage_user(message , cid)
+    step = user_step[cid]
+    _,qid = step.split('_')
+    qid = int(qid)
+    edit_question_answer_option(qid , int(message.text))
+    bot.send_message(cid , text['edited_successfully'])
+    user_step.pop(cid)
+
+@bot.message_handler(func = lambda m : user_step.get(m.chat.id , '_').startswith('getnewop'))
+def get_new_text_handler(message):
+    cid = message.chat.id
+    if is_spam(cid) : 
+        return
+    manage_user(message , cid)
+    step = user_step[cid]
+    _,op,qid = step.split('_')
+    qid = int(qid)
+    op = int(op)
+
+    if op == 1:
+        edit_question_option1(qid , message.text)
+    elif op == 2:
+        edit_question_option2(qid , message.text)
+    elif op == 3:
+        edit_question_option3(qid , message.text)
+    elif op == 4:
+        edit_question_option4(qid , message.text)
+
+    bot.send_message(cid , text['edited_successfully'])
     user_step.pop(cid)
 
 # -------------------------------------------- Support Admin
@@ -767,12 +1021,12 @@ def support_request_handler(message):
         bot.forward_message(admins[i] , cid , mid)
         bot.send_message(admins[i] , text['support_request'] , reply_markup=markup)
     # user
-    bot.copy_message(cid , channel_id , channel_messages['sended_support']) #to user who wanted support
+    bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['sended_support']) #to user who wanted support
     print(message.text)
     add_support_request(user_id = find_user_id(cid)['ID'] , message_id = mid , text = message.text)
     user_step.pop(cid)
 
-@bot.message_handler(func = lambda m : user_step.get(m.chat.id , '_').startswith('adminanswer')) # inline pressed
+@bot.message_handler(func = lambda m : user_step.get(m.chat.id , '_').startswith('adminanswer')) # inline pressed by admin
 def admin_answer_handler(message):
     cid = message.chat.id
     if is_spam(cid) : 
@@ -790,7 +1044,7 @@ def admin_answer_handler(message):
 def every_messages_handler(message):
     cid = message.chat.id
     markup = create_start_keyboard(cid)
-    bot.copy_message(cid , channel_id , channel_messages['help'] , reply_markup=markup)
+    bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['help'] , reply_markup=markup)
 
 get_admins()
 get_teachers()
