@@ -8,8 +8,10 @@ text = {
     'support_another_admin'         : 'این پیام توسط ادمین دیگر پاسخ داده شد',
     'hidden_user_reply'             : 'امکان ارسال پیام وجود ندارد، از دکمه پاسخ استفاده نمایید',
     'quiz_creating_command'         : 'شروع کوئیز',
+    'exam_creating_command'         : 'شروع آزمون',
     'show_categories'               : 'مشاهده موضوعات',
     'add_question_teacher'          : 'اضافه کردن یک سوال',
+    'add_question_teacher_mul'      : 'اضافه کردن چند سوال با فایل .xlsx',
     'add_teacher_admin'             : 'اضافه کردن معلم',
     'add_category_command'          : 'اضافه کردن موضوع',
     'add_category_admin'            : 'نام موضوع مورد نظر را وارد نمایید',
@@ -23,7 +25,7 @@ text = {
     'get_optionanswer'              : 'گزینه صحیح را وارد نمایید، به صورت عدد انگلیسی بین 1 تا 4',
     'get_textanswer'                : 'پاسخ تشریحی سوال را وارد کنید، یا به صورت متن یا به صورت یک عکس',
     'questoin_added'                : 'سوال مورد نظر در دیتابیس ذخیره شد',
-    'request_teacher'               : 'دسترسی طراحی سوال و آزمون',
+    'request_teacher'               : 'درخواست دسترسی به پنل معلم',
     'buttons_choice'                : 'می توانید گزینه های زیر را انتخاب نمایید',
     'user_teacher_added'            : 'کاربر تایید صلاحیت شده است',
     'category_choice_callanswe'     : 'موضوع انتخاب شد',
@@ -52,8 +54,20 @@ text = {
     'get_new_option'                : 'متن گزینه جدید را وارد نمایید',
     'get_new_photo'                 : 'عکس جدید صورت سوال را ارسال نمایید',
     'edited_successfully'           : 'سوال مورد نظر در دیتابیس آپدیت شد🟢',
-    # ----------------
+    # teacher panel
+    'teachpanel'                    : 'پنل معلم 💡',
+    'enterteacherpanel'             : 'ورود به پنل معلم 🟢',
+    'exitteacherpanel'              : 'خروج از پنل معلم 🔴',
+    'entergeneralquizpanel'         : 'ورود به بخش کوئیز 🟢',
+    'exitgeneralquizpanel'          : 'خروج از بخش کوئیز 🔴',
+    'enterexampanel'                : 'ورود به بخش مدیریت آزمون ها 🟢',
+    'exitexampanel'                 : 'خروج از بخش مدیریت آزمون ها 🔴',
+    'entercreateexampanel'          : 'ورود به بخش ساخت آزمون جدید 🟢',
+    'exitcreateexampanel'           : 'خروج از بخش ساخت آزمون جدید 🔴',
+    'enterreportpanel'              : 'ورود به پنل کارنامه 🟢',
+    'exitreportpanel'               : 'خروج از پنل کارنامه 🔴',
 }
+
 
 
 option_sticker = {
@@ -64,12 +78,31 @@ option_sticker = {
 }
 
 Button = {
-    'start'         : text['start_command']         + '💡',
-    'help'          : text['help_command']          + '❓',
-    'quiz'          : text['quiz_creating_command'] + '✖️➗',
-    'support'       : text['support_command']       + '📞',
-    'addquestion'   : text['add_question_teacher']  + '⚡',
-    'addcategory'   : text['add_category_command']  + '⚡',
-    'showcategory'  : text['show_categories']       + 'ℹ️',
-    'req_teacher'   : text['request_teacher']       + '🧑‍🏫',
+    'start'                 : text['start_command']             + '💡',
+    'help'                  : text['help_command']              + '❓',
+    'quiz'                  : text['quiz_creating_command']     + '✖️➗',
+    'exam'                  : text['exam_creating_command']     + '🧪',
+    'support'               : text['support_command']           + '📞',
+    'addquestion'           : text['add_question_teacher']      + '⚡',
+    'addquestionmul'        : text['add_question_teacher_mul']  + '⚡',
+    'addcategory'           : text['add_category_command']      + '⚡',
+    'showcategory'          : text['show_categories']           + 'ℹ️',
+    'req_teacher'           : text['request_teacher']           + '🧑‍🏫',
+    'generalquizpanel'      : 'افزودن سوال به بخش کوئیز'      + '✅',
+    'exammanagement'        : 'ورود به پنل مدیریت آزمون'      + '✅',
+    'exitgeneralquizpanel'  : 'خروج از بخش کوئیز'             + '❌',
+    'exitexammanagement'    : 'خروج از بخش مدیریت آزمون'      + '❌',
+    # -------------
+    'showexams'             : 'مشاهده آزمون ها 💡',
+    'createexam'            : 'ساخت آزمون جدید  🧪',
+    'exitcreateexam'        : 'خروج از پنل ساخت آزمون جدید ❌',
+    # -------------
+    'teacherpanel'          : text['teachpanel'],
+    'exitteacherpanel'      : 'خروج از پنل معلم ❌',
+    # ---------------
+    'reportpanel'           : 'پنل کارنامه 📝',
+    'exitreportpanel'       : 'خروج از پنل کارنامه ❌',
+    'quizreport'            : 'مشاهده عملکرد در کوئیز ها 📝',
+    'examreport'            : 'مشاهده عملکرد در آزمون ها 📝',
+    # ---------------
 }

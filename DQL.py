@@ -106,7 +106,7 @@ def find_designer_telegram_id(question_id): # who added this question (question_
     connection = mysql.connector.connect(**config , database = database_name)
     cur = connection.cursor(dictionary=True)
     SQL_QUERY = '''
-            SELECT Q.ID AS `question_id`,U.telegram_id FROM questions AS Q INNER JOIN users AS U ON Q.designer_id = U.id WHERE Q.ID = (%s);
+        SELECT Q.ID AS `question_id`,U.telegram_id FROM questions AS Q INNER JOIN users AS U ON Q.designer_id = U.id WHERE Q.ID = (%s);
     ''' 
     cur.execute(SQL_QUERY , (question_id , ))
     result = cur.fetchone()
@@ -114,7 +114,28 @@ def find_designer_telegram_id(question_id): # who added this question (question_
     connection.close()
     return result['telegram_id']
 
+def get_report_quiz_from_telegram_id(cid):
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor(dictionary=True)
+    SQL_QUERY = '''
+        select u.telegram_id , q.id as question_id ,  us.selected_option , q.answer_option 
+        from quiz.user_answers as us 
+
+        inner join quiz.users as u 
+        on us.user_id = u.id 
+        inner join quiz.questions as q
+        on q.id = us.question_id
+
+        where telegram_id = (%s) and us.exam_id is null
+    '''
+    cur.execute(SQL_QUERY , (cid,))
+    result = cur.fetchall()
+    cur.close()
+    connection.close()
+    return result
+
 if __name__ == '__main__':
-    print(find_designer_telegram_id(2))
+    pass
+    # print(find_designer_telegram_id(2))
     # print(is_answered_this_question(2 , 2))
     #  print(get_question_information(2))

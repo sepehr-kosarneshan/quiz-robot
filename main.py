@@ -29,6 +29,7 @@ command = {
     '/showcategory'     : text['show_categories'],
     '/reqteach'         : text['request_teacher'],
 }
+
 teacher_commands = {
     '/addquestion' : text['add_question_teacher'],
     '/addcategory' : text['add_category_command'],
@@ -64,6 +65,13 @@ EDIT_QUESTION_PAGES = [
 ]
 
 user_step = {}
+
+TEACHER_PANEL = 0
+GENERAL_QUIZ_PANEL = 1
+EXAM_PANEL = 2
+CREATE_EXAM_PANEL = 3
+
+user_panel = {} # cid : panel
 admin_question = {} # cid : {text : ... , file_id : ... , options : ... , answer_option : ... , answer_text : ...}
 
 # ----- spam
@@ -176,14 +184,73 @@ def show_commands(cid):
     return result
 
 def create_start_keyboard(cid) :
+    try :
+        user_panel.pop(cid)
+    except :
+        pass
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
     keyboard.add(Button['start'] , Button['help'],Button['support'])
     keyboard.add(Button['showcategory'])
-    keyboard.add(Button['quiz'])
-    keyboard.add(Button['req_teacher'])
-    if cid in teachers :
-        keyboard.add(Button['addquestion'],Button['addcategory'])
+    keyboard.add(Button['quiz'],Button['exam'])
+    keyboard.add(Button['reportpanel'])
+    if  (cid not in teachers) and (cid not in admins):
+        keyboard.add(Button['req_teacher'])
+    else:
+        # keyboard.add(Button['addquestion'],Button['addcategory'])
+        keyboard.add(Button['teacherpanel'])
+        
     return keyboard
+# ---------------
+def create_teacher_panel(cid) :
+    user_panel[cid] = TEACHER_PANEL
+    if (cid not in teachers) and (cid not in admins):
+        return False
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+    keyboard.add(Button['generalquizpanel'])
+    keyboard.add(Button['exammanagement'])
+    keyboard.add(Button['addcategory'])
+    keyboard.add(Button['exitteacherpanel'])
+    return keyboard
+
+def create_general_quiz_panel(cid):
+    user_panel[cid] = GENERAL_QUIZ_PANEL
+    if (cid not in teachers) and (cid not in admins):
+        return False
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+    keyboard.add(Button['addquestion'])
+    keyboard.add(Button['addquestionmul'])
+    keyboard.add(Button['exitgeneralquizpanel'])
+    return keyboard
+
+def create_exam_management_panel(cid):
+    user_panel[cid] = EXAM_PANEL
+    if (cid not in teachers) and (cid not in admins):
+        return False
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+    keyboard.add(Button['showexams'])
+    keyboard.add(Button['createexam'])
+    keyboard.add(Button['exitexammanagement'])
+    return keyboard
+
+def create_exam_panel(cid):
+    user_panel[cid] = CREATE_EXAM_PANEL
+    if (cid not in teachers) and (cid not in admins):
+        return False
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+    keyboard.add(Button['exitcreateexam'])
+    return keyboard
+
+def create_report_panel(cid):
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+    keyboard.add(Button['quizreport']) # inline 
+    keyboard.add(Button['examreport']) # inline 
+    keyboard.add(Button['exitreportpanel'])
+    return keyboard
+# ---------------
+
+def create_report_quiz(cid): # working here ...
+    pass
+
 
 def category_pages(clist) : # clist : DQL.get_categories()
     result = []
@@ -298,30 +365,35 @@ def create_inline_for_answered_option(user_choice ,correct_option , question_id 
             options[i] += 'c'
         elif options[i] == str(user_choice) :
             options[i] += 'u'
+    Buttons = []
     for i in range(len(options)):
         if 'uc' in options[i]:
             text_option = option_sticker[str(options[i][0])]
-            markup.add(InlineKeyboardButton(text_option , callback_data='None' , style='success'))
+            Buttons.append(InlineKeyboardButton(text_option , callback_data='None' , style='success'))
         elif 'u' in options[i]:
             text_option = option_sticker[str(options[i][0])]
-            markup.add(InlineKeyboardButton(text_option , callback_data='None' , style= 'danger'))
+            Buttons.append(InlineKeyboardButton(text_option , callback_data='None' , style= 'danger'))
         elif 'c' in options[i] :
             text_option = option_sticker[str(options[i][0])]
-            markup.add(InlineKeyboardButton(text_option , callback_data='None' , style= 'success'))
+            Buttons.append(InlineKeyboardButton(text_option , callback_data='None' , style= 'success'))
         else :
             text_option = option_sticker[str(options[i][0])]
-            markup.add(InlineKeyboardButton(text_option , callback_data='None'))
+            Buttons.append(InlineKeyboardButton(text_option , callback_data='None'))
+    markup.add(Buttons[0] , Buttons[1] , Buttons[2] , Buttons[3])
     markup.add(InlineKeyboardButton(text['get_answer_for_question'] , callback_data=f'getanswer_{mid}_{question_id}' , style='primary'))
     markup.add(InlineKeyboardButton(text['delete_question'] , callback_data=f'deletequestion'))
     return markup
     
 def create_inline_for_options(question_id):
     markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton(option_sticker['1'] , callback_data = f'option_1_{question_id}'))
-    markup.add(InlineKeyboardButton(option_sticker['2'] , callback_data = f'option_2_{question_id}'))
-    markup.add(InlineKeyboardButton(option_sticker['3'] , callback_data = f'option_3_{question_id}'))
-    markup.add(InlineKeyboardButton(option_sticker['4'] , callback_data = f'option_4_{question_id}'))
-    markup.add(InlineKeyboardButton(text['delete_question'] , callback_data=f'deletequestion'))
+    Buttons = [InlineKeyboardButton(option_sticker['1'] , callback_data = f'option_1_{question_id}') ,\
+            InlineKeyboardButton(option_sticker['2'] , callback_data = f'option_2_{question_id}') ,\
+            InlineKeyboardButton(option_sticker['3'] , callback_data = f'option_3_{question_id}'),\
+            InlineKeyboardButton(option_sticker['4'] , callback_data = f'option_4_{question_id}'),\
+            InlineKeyboardButton(text['delete_question'] , callback_data=f'deletequestion')]
+
+    markup.add(Buttons[0] , Buttons[1] , Buttons[2] , Buttons[3])
+    markup.add(Buttons[4])
     return markup
 
 def create_text_caption_for_question(question_id):
@@ -648,7 +720,7 @@ def start_command_handler(message):
     bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['start'] , reply_markup = markup)
     #bot.send_message(cid , show_commands(cid) , parse_mode='MarkdownV2')
 
-@bot.message_handler(func=lambda m: m.text in ['/help', Button['help']])
+@bot.message_handler(func=lambda m: m.text in ['/help', Button['help']]) # Working on this, we have no commands
 def start_command_handler(message):
     cid = message.chat.id
     if is_spam(cid) : 
@@ -656,7 +728,132 @@ def start_command_handler(message):
     manage_user(message , cid)
     markup = create_start_keyboard(cid)
     bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['help'] , reply_markup = markup)
-    bot.send_message(cid , show_commands(cid) , parse_mode='MarkdownV2')
+    # bot.send_message(cid , show_commands(cid) , parse_mode='MarkdownV2')
+
+@bot.message_handler(func = lambda m: m.text == Button['reportpanel'])
+def show_performance_handler(message):
+    cid = message.chat.id
+    markup = create_report_panel(cid)
+    bot.send_message(cid , text['enterreportpanel'] , reply_markup=markup)
+
+@bot.message_handler(func = lambda m : m.text == Button['exitreportpanel'])
+def exit_report_panel_handler(message):
+    cid = message.chat.id
+    markup = create_start_keyboard(cid)
+    bot.send_message(cid , text['exitreportpanel'] , reply_markup=markup)    
+
+# ------------------
+
+@bot.message_handler(func = lambda m : m.text == Button['teacherpanel'])
+def teacher_panel_handler(message):
+    cid = message.chat.id
+    if is_spam(cid) :  
+            return 
+    manage_user(message , cid)
+    if (cid not in teachers) and (cid not in admins):
+        markup = create_start_keyboard(cid)
+        bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['help'] , reply_markup=markup) 
+
+    markup = create_teacher_panel(cid)
+    bot.send_message(cid , text['enterteacherpanel'] , reply_markup=markup)
+
+@bot.message_handler(func = lambda m : m.text == Button['exitteacherpanel'])
+def teacher_panel_handler(message):
+    cid = message.chat.id
+    if is_spam(cid) : 
+            return 
+    manage_user(message , cid)
+    if (cid not in teachers) and (cid not in admins):
+        markup = create_start_keyboard(cid)
+        bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['help'] , reply_markup=markup) 
+
+    markup = create_start_keyboard(cid)
+    bot.send_message(cid , text['exitteacherpanel'] , reply_markup=markup)
+
+# ------------------
+
+@bot.message_handler(func = lambda m : m.text == Button['generalquizpanel'])
+def teacher_panel_handler(message):
+    cid = message.chat.id
+    if is_spam(cid) : 
+            return 
+    manage_user(message , cid)
+    if (cid not in teachers) and (cid not in admins):
+        markup = create_start_keyboard(cid)
+        bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['help'] , reply_markup=markup) 
+
+    markup = create_general_quiz_panel(cid)
+    bot.send_message(cid , text['entergeneralquizpanel'] , reply_markup=markup)
+
+@bot.message_handler(func = lambda m : m.text == Button['exitgeneralquizpanel'])
+def teacher_panel_handler(message):
+    cid = message.chat.id
+    if is_spam(cid) : 
+            return 
+    manage_user(message , cid)
+    if (cid not in teachers) and (cid not in admins):
+        markup = create_teacher_panel(cid)
+        bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['help'] , reply_markup=markup) 
+
+    markup = create_teacher_panel(cid)
+    bot.send_message(cid , text['exitgeneralquizpanel'] , reply_markup=markup)
+# ------------------
+
+@bot.message_handler(func = lambda m : m.text == Button['exammanagement'])
+def teacher_panel_handler(message):
+    cid = message.chat.id
+    if is_spam(cid) : 
+            return 
+    manage_user(message , cid)
+    if (cid not in teachers) and (cid not in admins):
+        markup = create_start_keyboard(cid)
+        bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['help'] , reply_markup=markup) 
+
+    markup = create_exam_management_panel(cid)
+    bot.send_message(cid , text['enterexampanel'] , reply_markup=markup)
+
+@bot.message_handler(func = lambda m : m.text == Button['exitexammanagement'])
+def teacher_panel_handler(message):
+    cid = message.chat.id
+    if is_spam(cid) : 
+            return 
+    manage_user(message , cid)
+    if (cid not in teachers) and (cid not in admins):
+        markup = create_teacher_panel(cid)
+        bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['help'] , reply_markup=markup) 
+
+    markup = create_teacher_panel(cid)
+    bot.send_message(cid , text['exitexampanel'] , reply_markup=markup)
+
+# ------------------
+
+@bot.message_handler(func = lambda m : m.text == Button['createexam'])
+def teacher_panel_handler(message):
+    cid = message.chat.id
+    if is_spam(cid) : 
+            return 
+    manage_user(message , cid)
+    if (cid not in teachers) and (cid not in admins):
+        markup = create_start_keyboard(cid)
+        bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['help'] , reply_markup=markup) 
+
+    markup = create_exam_panel(cid)
+    bot.send_message(cid , text['entercreateexampanel'] , reply_markup=markup)
+
+@bot.message_handler(func = lambda m : m.text == Button['exitcreateexam'])
+def teacher_panel_handler(message):
+    cid = message.chat.id
+    if is_spam(cid) : 
+            return 
+    manage_user(message , cid)
+    if (cid not in teachers) and (cid not in admins):
+        markup = create_start_keyboard(cid)
+        bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['help'] , reply_markup=markup) 
+
+    markup = create_exam_management_panel(cid)
+    bot.send_message(cid , text['exitcreateexampanel'] , reply_markup=markup)
+
+# ---------------
 
 # Teacher Request ------------------------------------
 
@@ -952,7 +1149,7 @@ def get_new_text_handler(message):
 @bot.message_handler(content_types=['text','photo'], func = lambda m : user_step.get(m.chat.id , '_').startswith('getnewanstext'))
 def get_new_text_handler(message):
     cid = message.chat.id
-    if is_spam(cid) : 
+    if is_spam(cid) :
         return
     manage_user(message , cid)
     step = user_step[cid]
