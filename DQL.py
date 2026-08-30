@@ -119,6 +119,7 @@ def get_report_quiz_from_telegram_id(cid):
     cur = connection.cursor(dictionary=True)
     SQL_QUERY = '''
         select u.telegram_id , q.id as question_id ,  us.selected_option , q.answer_option 
+        
         from quiz.user_answers as us 
 
         inner join quiz.users as u 
@@ -134,8 +135,59 @@ def get_report_quiz_from_telegram_id(cid):
     connection.close()
     return result
 
+# exam section
+
+def get_exams_from_user_id(user_id):
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor(dictionary=True)
+    SQL_QUERY = '''
+        SELECT id,name FROM exam WHERE designer_id = (%s)
+    '''
+    cur.execute(SQL_QUERY , (user_id , ))
+    result = cur.fetchall()
+    cur.close()
+    connection.close()
+    return result
+
+def get_exam_data_id(id):
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor(dictionary=True)
+    SQL_QUERY = '''
+        SELECT id,name,special_code,is_active,time FROM exam WHERE id = (%s)
+    '''
+    cur.execute(SQL_QUERY , (id , ))
+    result = cur.fetchone()
+    cur.close()
+    connection.close()
+    return result
+
+def is_special_code_exist(special_code):
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor(dictionary=True)
+    SQL_QUERY = '''
+        SELECT name FROM exam WHERE `special_code` = (%s)
+    '''
+    cur.execute(SQL_QUERY , (special_code , ))
+    result = cur.fetchall()
+    cur.close()
+    connection.close()
+    return len(result) != 0
+
+def get_question_count_for_exam(exam_id):
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor(dictionary=True)
+    SQL_QUERY = '''
+        SELECT id FROM exam_questions WHERE `exam_id` = (%s)
+    '''
+    cur.execute(SQL_QUERY , (exam_id , ))
+    result = cur.fetchall()
+    cur.close()
+    connection.close()
+    return len(result)
+
 if __name__ == '__main__':
-    pass
+    print(is_special_code_exist('1234'))
+    # print(find_user_id(1454840970)['ID'])
     # print(find_designer_telegram_id(2))
     # print(is_answered_this_question(2 , 2))
-    #  print(get_question_information(2))
+    # print(get_question_information(2))

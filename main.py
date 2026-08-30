@@ -9,6 +9,8 @@ import random
 from Text import *
 from DQL import *
 from DML import *
+from read_excel_file import *
+import secrets
 
 setup_proxy(
     proxy_token=proxy_token
@@ -16,6 +18,8 @@ setup_proxy(
 
 bot = telebot.TeleBot(telegram_token , threaded= 5)
 hide_board = ReplyKeyboardRemove()
+
+os.makedirs(os.path.join('excel_files' , 'data') , exist_ok=True)
 
 #print(f'{os.getcwd()}')
 
@@ -47,6 +51,9 @@ CHANNEL_MESSAGES = {
     'you_added_teacher' : 12,
     'request_for_quiz'  : 14,
     'quesiton_report'   : 16,
+    'guideforexcelQ'    : 18,
+    'showexamsandmanage': 20,
+    'guideformanageexam': 22,
 }
 
 EDIT_QUESTION_PAGES = [
@@ -69,11 +76,11 @@ user_step = {}
 TEACHER_PANEL = 0
 GENERAL_QUIZ_PANEL = 1
 EXAM_PANEL = 2
-CREATE_EXAM_PANEL = 3
+ADDAQUESTIONEXAM = 3
 
 user_panel = {} # cid : panel
 admin_question = {} # cid : {text : ... , file_id : ... , options : ... , answer_option : ... , answer_text : ...}
-
+teacher_exam = {} # cid : {name : ... , time : ...}
 # ----- spam
 lower_limit = 2     # sec
 upper_limit = 15    # sec
@@ -85,6 +92,10 @@ teachers = []
 admins = []
 
 question_count = 1 # for public quiz
+
+def generate_exam_special_code(length = 7):
+    characters = "ABCDEFGHJKMNPQRSTUVWXYZ23456789!@*&"
+    return "".join(secrets.choice(characters) for _ in range(length))
 
 def get_admins():
     global admins
@@ -113,7 +124,7 @@ def set_name(first_name , last_name) :
             name = None
     return name
 
-def manage_user(message , cid): 
+def manage_user(message , cid):  # working here ...
     global admins
     global teachers
     print('teachers : ' , teachers , sep = ' : ')
@@ -206,10 +217,9 @@ def create_teacher_panel(cid) :
     if (cid not in teachers) and (cid not in admins):
         return False
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
-    keyboard.add(Button['generalquizpanel'])
-    keyboard.add(Button['exammanagement'])
+    keyboard.add(Button['generalquizpanel'] , Button['exammanagement'])
     keyboard.add(Button['addcategory'])
-    keyboard.add(Button['exitteacherpanel'])
+    keyboard.add(Button['exitteacherpanel'],Button['support'])
     return keyboard
 
 def create_general_quiz_panel(cid):
@@ -217,9 +227,11 @@ def create_general_quiz_panel(cid):
     if (cid not in teachers) and (cid not in admins):
         return False
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
-    keyboard.add(Button['addquestion'])
-    keyboard.add(Button['addquestionmul'])
-    keyboard.add(Button['exitgeneralquizpanel'])
+    keyboard.add(Button['addquestion'],Button['addquestionmul'])
+    # keyboard.add(Button['addquestionmul'])
+    keyboard.add(Button['showphotoid'])
+    keyboard.add(Button['guideformultipleques'])
+    keyboard.add(Button['exitgeneralquizpanel'],Button['support'])
     return keyboard
 
 def create_exam_management_panel(cid):
@@ -227,28 +239,30 @@ def create_exam_management_panel(cid):
     if (cid not in teachers) and (cid not in admins):
         return False
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
-    keyboard.add(Button['showexams'])
-    keyboard.add(Button['createexam'])
-    keyboard.add(Button['exitexammanagement'])
-    return keyboard
-
-def create_exam_panel(cid):
-    user_panel[cid] = CREATE_EXAM_PANEL
-    if (cid not in teachers) and (cid not in admins):
-        return False
-    keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
-    keyboard.add(Button['exitcreateexam'])
+    keyboard.add(Button['showexams'] , Button['createexam'])
+    keyboard.add(Button['showphotoid'])
+    keyboard.add(Button['guideformultipleques'])
+    keyboard.add(Button['exitexammanagement'],Button['support'])
     return keyboard
 
 def create_report_panel(cid):
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
     keyboard.add(Button['quizreport']) # inline 
     keyboard.add(Button['examreport']) # inline 
-    keyboard.add(Button['exitreportpanel'])
+    keyboard.add(Button['exitreportpanel'],Button['support'])
     return keyboard
 # ---------------
 
-def create_report_quiz(cid): # working here ...
+def create_category_excel(data): # data : DQL.get_categories() in excel_files folder on category.xlsx
+    with open(os.path.join('excel_files' , 'category.csv') , 'w' , encoding="utf-8-sig") as f:
+        result = 'name,id\n'
+        for item in data:
+            result += f'{item['NAME']},{item['ID']}\n'
+        f.write(result)
+    return True
+
+
+def create_report_quiz(cid): # working here ... 
     pass
 
 
@@ -435,7 +449,69 @@ def send_question(cid , question_id):
     else :
         message = bot.send_message(cid , result , reply_markup=markup)
     return message
+# ----------------------------------
+def create_text_for_exam_data(id):
+    data = get_exam_data_id(id)
+    active = 'Yes' if data['is_active'] == 1 else 'No'
+    result = f'ℹ️ Information ℹ️\n✅ID : {data['id']}\n✅Name : {data['name']}\n✅Special Code : {data['special_code']}\n✅Active : {active}\n✅Time : {data['time']} minutes'
+    return result 
 
+def create_inline_manage_exam(id):
+    '''
+        id --> exam id
+    '''
+    markup = InlineKeyboardMarkup()
+    data = get_exam_data_id(id)
+    if data['is_active'] == 1:
+        markup.add(InlineKeyboardButton(text['deactivate'] , callback_data=f'examdeactive_{id}' , style='danger') \
+                  ,InlineKeyboardButton(text['timechange'] , callback_data=f'examtimechange_{id}'))
+    else :
+        markup.add(InlineKeyboardButton(text['activate'] , callback_data=f'examactive_{id}' , style='success') \
+                  ,InlineKeyboardButton(text['timechange'] , callback_data=f'examtimechange_{id}'))
+    markup.add(InlineKeyboardButton(text['examaddonequestion'] , callback_data=f'examaddone_{id}'))
+    markup.add(InlineKeyboardButton(text['examaddmulquestion'] , callback_data=f'examaddmul_{id}'))
+    markup.add(InlineKeyboardButton(text['questioncount'] , callback_data=f'getcountquestion_{id}' , style='primary'),\
+               InlineKeyboardButton(text['specialcodeget'] , callback_data=f'getspecialcode_{id}' , style = 'primary'))
+    return markup
+
+def create_page_list_for_exams(data):
+    '''
+        data = get_exams_from_user_id(user_id)
+    '''
+    result = []
+    row = []
+    for i in range(len(data)):
+        row.append(data[i])
+        if len(row) >= 4:
+            result.append(row)
+            row = [] 
+    if len(row) > 0:
+        result.append(row)
+    return result
+
+def create_inline_for_show_exams(data , page = 0): 
+    '''
+        data = get_exams_from_user_id(user_id)
+    '''
+    exam_pages = create_page_list_for_exams(data)
+    if 0<= page <= len(exam_pages) - 1 :
+        exam = exam_pages[page]
+        markup = InlineKeyboardMarkup()
+        for i in range(len(exam)):
+            markup.add(InlineKeyboardButton(f'{exam[i]['name']}' , callback_data= f'examshowdata_{exam[i]['id']}'))
+        left_button = InlineKeyboardButton('◀️' , callback_data=f'examshowchpage_{page - 1}')
+        right_button = InlineKeyboardButton('▶️' , callback_data=f'examshowchpage_{page + 1}')
+        if len(exam_pages) != 1:
+            if page == len(exam_pages) - 1:
+                markup.add(left_button)
+            elif page == 0 : 
+                markup.add(right_button)
+            else :
+                markup.add(left_button , right_button)
+        return markup
+    else :
+        return False
+    
 # ----------------------------------
 
 def listener(messages):
@@ -478,8 +554,18 @@ def callback_handler(call):
 
         bot.send_message(cid , text['add_question_admin_resp'])
         bot.send_message(cid , text['photo_and_text_question'])
-        user_step.setdefault(cid , f'addquestion_{category_id}')
-        print(user_step)
+        if str(user_panel[cid]).startswith('ADDAQUESTIONEXAM') :
+            print('Add Question Panel')
+            status = user_panel[cid]
+            _,exam_id = status.split('_')
+            user_step.setdefault(cid , '')
+            user_step[cid] = f'addquestion_{category_id}_{exam_id}'
+            user_panel[cid] = ADDAQUESTIONEXAM
+            print(user_step)
+        else :
+            print('General Quiz Panel')
+            user_step.setdefault(cid , f'addquestion_{category_id}')
+            print(user_step)
 
     # categories
     elif data.startswith('changepageshowcat'):
@@ -697,7 +783,83 @@ def callback_handler(call):
         bot.edit_message_reply_markup(cid , mid , reply_markup=new_markup)
         bot.answer_callback_query(call_id , 'page changed')
 
-    elif data == 'deleteans' : 
+    # -------------------- exam management
+    elif data.startswith('specialcodeget'):
+        # working here
+        pass 
+
+    elif data.startswith('getcountquestion'):
+        _,exam_id = data.split('_')
+        exam_id = int(exam_id)
+        count = get_question_count_for_exam(exam_id)
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton(text['deletemessage'] , callback_data='deletemessage'))
+        bot.send_message(cid , count , reply_to_message_id = mid ,reply_markup=markup)
+        bot.answer_callback_query(call_id , f'count : {count}')
+
+    elif data.startswith('examdeactive'):
+        _,exam_id = data.split('_')
+        deactive_exam(exam_id=exam_id)
+        new_text = create_text_for_exam_data(exam_id)
+        new_markup = create_inline_manage_exam(exam_id)
+        new_text = create_text_for_exam_data(exam_id)
+        bot.edit_message_text(new_text , cid , mid)
+        bot.edit_message_reply_markup(cid , mid , reply_markup = new_markup)
+        bot.answer_callback_query(call_id , 'deactive')
+
+    elif data.startswith('examactive'):
+        _,exam_id = data.split('_')
+        active_exam(exam_id=exam_id)
+        new_text = create_text_for_exam_data(exam_id)
+        new_markup = create_inline_manage_exam(exam_id)
+        new_text = create_text_for_exam_data(exam_id)
+        bot.edit_message_text(new_text , cid , mid)
+        bot.edit_message_reply_markup(cid , mid , reply_markup = new_markup)
+        bot.answer_callback_query(call_id , 'deactive')
+
+    elif data.startswith('examtimechange'):
+        _,exam_id = data.split('_')
+        user_step.setdefault(cid , '')
+        user_step[cid] = f'examtimechange_{exam_id}_{mid}'
+        print(user_step)
+        bot.send_message(cid , text['examtimechanging'])
+        bot.answer_callback_query(call_id , 'time change')
+
+    elif data.startswith('examaddone'):
+        _,exam_id = data.split('_')
+        data = get_categories()
+        markup = create_inlinekeyboard_for_categoris(data , 0)
+        bot.send_message(cid , text['choice_category_admin'] , reply_markup=markup)
+        user_panel.setdefault(cid , '')
+        user_panel[cid] = f'ADDAQUESTIONEXAM_{exam_id}'
+        bot.answer_callback_query(call_id , 'add one question')
+
+    elif data.startswith('examaddmul'):
+        _,exam_id = data.split('_')
+        user_step.setdefault(cid , '')
+        user_step[cid] = f'addmulquestionexam_{exam_id}'
+        bot.send_message(cid , text['getfileforquestions'])
+        bot.answer_callback_query(call_id , 'add questions')
+
+    elif data.startswith('examshowchpage'):
+        _,new_page = data.split('_')
+        data = get_exams_from_user_id(find_user_id(cid)['ID'])
+        new_markup = create_inline_for_show_exams(data = data , page = new_page)
+        bot.edit_message_reply_markup(cid , mid , reply_markup=new_markup)
+        bot.answer_callback_query(call_id , 'page changed')
+
+    elif data.startswith('examshowdata'):
+        _,exam_id = data.split('_')
+        exam_id = int(exam_id)
+        data = get_exam_data_id(exam_id)
+        result = create_text_for_exam_data(exam_id)
+        markup = create_inline_manage_exam(exam_id)
+        bot.send_message(cid , result , reply_markup=markup)
+        bot.answer_callback_query(call_id , 'show data')
+
+    # -------------
+    
+    elif data == 'deleteans' or data == 'deletemessage' : 
         bot.delete_message(cid , mid)
         bot.answer_callback_query(call_id , 'message deleted')
 
@@ -707,8 +869,8 @@ def callback_handler(call):
         
     elif data == 'None' :
         bot.answer_callback_query(call_id , 'None')
-    
 
+    
 @bot.message_handler(func=lambda m: m.text in ['/start', Button['start']])
 def start_command_handler(message):
     cid = message.chat.id
@@ -740,7 +902,11 @@ def show_performance_handler(message):
 def exit_report_panel_handler(message):
     cid = message.chat.id
     markup = create_start_keyboard(cid)
-    bot.send_message(cid , text['exitreportpanel'] , reply_markup=markup)    
+    bot.send_message(cid , text['exitreportpanel'] , reply_markup=markup)
+    try :
+        user_step.pop(cid) 
+    except :
+        pass   
 
 # ------------------
 
@@ -748,7 +914,7 @@ def exit_report_panel_handler(message):
 def teacher_panel_handler(message):
     cid = message.chat.id
     if is_spam(cid) :  
-            return 
+        return 
     manage_user(message , cid)
     if (cid not in teachers) and (cid not in admins):
         markup = create_start_keyboard(cid)
@@ -761,7 +927,7 @@ def teacher_panel_handler(message):
 def teacher_panel_handler(message):
     cid = message.chat.id
     if is_spam(cid) : 
-            return 
+        return 
     manage_user(message , cid)
     if (cid not in teachers) and (cid not in admins):
         markup = create_start_keyboard(cid)
@@ -769,6 +935,10 @@ def teacher_panel_handler(message):
 
     markup = create_start_keyboard(cid)
     bot.send_message(cid , text['exitteacherpanel'] , reply_markup=markup)
+    try :
+        user_step.pop(cid) 
+    except :
+        pass 
 
 # ------------------
 
@@ -776,7 +946,7 @@ def teacher_panel_handler(message):
 def teacher_panel_handler(message):
     cid = message.chat.id
     if is_spam(cid) : 
-            return 
+        return 
     manage_user(message , cid)
     if (cid not in teachers) and (cid not in admins):
         markup = create_start_keyboard(cid)
@@ -789,7 +959,7 @@ def teacher_panel_handler(message):
 def teacher_panel_handler(message):
     cid = message.chat.id
     if is_spam(cid) : 
-            return 
+        return 
     manage_user(message , cid)
     if (cid not in teachers) and (cid not in admins):
         markup = create_teacher_panel(cid)
@@ -797,13 +967,17 @@ def teacher_panel_handler(message):
 
     markup = create_teacher_panel(cid)
     bot.send_message(cid , text['exitgeneralquizpanel'] , reply_markup=markup)
+    try :
+        user_step.pop(cid) 
+    except :
+        pass 
 # ------------------
 
 @bot.message_handler(func = lambda m : m.text == Button['exammanagement'])
 def teacher_panel_handler(message):
     cid = message.chat.id
     if is_spam(cid) : 
-            return 
+        return 
     manage_user(message , cid)
     if (cid not in teachers) and (cid not in admins):
         markup = create_start_keyboard(cid)
@@ -816,7 +990,7 @@ def teacher_panel_handler(message):
 def teacher_panel_handler(message):
     cid = message.chat.id
     if is_spam(cid) : 
-            return 
+        return 
     manage_user(message , cid)
     if (cid not in teachers) and (cid not in admins):
         markup = create_teacher_panel(cid)
@@ -824,6 +998,10 @@ def teacher_panel_handler(message):
 
     markup = create_teacher_panel(cid)
     bot.send_message(cid , text['exitexampanel'] , reply_markup=markup)
+    try :
+        user_step.pop(cid) 
+    except :
+        pass 
 
 # ------------------
 
@@ -831,20 +1009,56 @@ def teacher_panel_handler(message):
 def teacher_panel_handler(message):
     cid = message.chat.id
     if is_spam(cid) : 
-            return 
+        return 
     manage_user(message , cid)
     if (cid not in teachers) and (cid not in admins):
         markup = create_start_keyboard(cid)
         bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['help'] , reply_markup=markup) 
 
-    markup = create_exam_panel(cid)
-    bot.send_message(cid , text['entercreateexampanel'] , reply_markup=markup)
+    bot.send_message(cid , text['enterexamname'])
+    user_step.setdefault(cid , '')
+    user_step[cid] = 'getexamname'
+
+@bot.message_handler(func = lambda m : user_step.get(m.chat.id , '_') == 'getexamname')
+def get_exam_name_handler(message):
+    cid = message.chat.id
+    if is_spam(cid) : 
+        return 
+    manage_user(message , cid)
+    name = message.text
+    name = name.strip()
+    teacher_exam.setdefault(cid , {})
+    teacher_exam[cid].setdefault('name' , name)
+    user_step[cid] = 'getexamtime'
+    bot.send_message(cid , text['getexamtime'])
+
+@bot.message_handler(func = lambda m : user_step.get(m.chat.id , '_') == 'getexamtime')
+def get_exam_name_handler(message):
+    cid = message.chat.id
+    if is_spam(cid) : 
+        return 
+    manage_user(message , cid)
+    exam_time = message.text
+    exam_time = int(exam_time.strip())
+    designer_id = find_user_id(cid)['ID']
+    special_code = generate_exam_special_code()
+    while is_special_code_exist(special_code):
+        special_code = generate_exam_special_code()
+
+    create_exam(name = teacher_exam[cid]['name'] ,
+                designer_id = designer_id , 
+                time = exam_time , 
+                code = special_code)
+    
+    bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['guideformanageexam'])
+    teacher_exam.pop(cid)
+    user_step.pop(cid)
 
 @bot.message_handler(func = lambda m : m.text == Button['exitcreateexam'])
 def teacher_panel_handler(message):
     cid = message.chat.id
     if is_spam(cid) : 
-            return 
+        return 
     manage_user(message , cid)
     if (cid not in teachers) and (cid not in admins):
         markup = create_start_keyboard(cid)
@@ -852,8 +1066,182 @@ def teacher_panel_handler(message):
 
     markup = create_exam_management_panel(cid)
     bot.send_message(cid , text['exitcreateexampanel'] , reply_markup=markup)
+    try :
+        user_step.pop(cid) 
+    except :
+        pass 
+
+@bot.message_handler(func = lambda m : m.text == Button['showexams'])
+def show_exams_handler(message):
+    cid = message.chat.id
+    if is_spam(cid):
+        return
+    manage_user(message , cid)
+    if (cid not in teachers) and (cid not in admins):
+        markup = create_start_keyboard(cid)
+        bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['help'] , reply_markup=markup) 
+
+    data = get_exams_from_user_id(find_user_id(cid)['ID'])
+    if len(data) == 0:
+        bot.send_message(cid , text['noexamhere'])
+    else :
+        markup = create_inline_for_show_exams(data)
+        bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['showexamsandmanage'] , reply_markup=markup)
+
+@bot.message_handler(func = lambda m : user_step.get(m.chat.id , '_').startswith('examtimechange'))
+def time_changing_handler(message):
+    cid = message.chat.id
+    status = user_step[cid]
+    _,exam_id,mid = status.split('_')
+    exam_id = int(exam_id)
+    mid = int(mid)
+    try :
+        change_time_exam(exam_id , int(message.text))
+        new_text = create_text_for_exam_data(exam_id)
+        new_markup = create_inline_manage_exam(exam_id)
+        try :
+            bot.edit_message_text(new_text , cid , mid)
+            bot.edit_message_reply_markup(cid , mid , reply_markup=new_markup)
+        except :
+            pass
+        bot.send_message(cid , text['success'])
+    except :
+        bot.send_message(cid , text['wrongvaluefortime'])
+# ---------------
+
+@bot.message_handler(func = lambda m : (m.text == Button['addquestionmul']))
+def add_multiple_question_for_quiz_handler(message):
+    cid = message.chat.id
+    if is_spam(cid) : 
+        return 
+    manage_user(message , cid)
+    if (cid not in teachers) and (cid not in admins):
+        markup = create_teacher_panel(cid)
+        bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['help'] , reply_markup=markup) 
+    user_step.setdefault(cid , '')
+    user_step[cid] = 'get_question_document'
+    bot.send_message(cid , text['getfileforquestions'])
+
+# add questionmul for an exam
+# addmulquestionexam
+@bot.message_handler(content_types=['document'] , func = lambda m : user_step.get(m.chat.id , '_').startswith('addmulquestionexam'))
+def add_multiple_question_for_exam_handler(message):
+    cid = message.chat.id
+    if is_spam(cid) : 
+        return 
+    manage_user(message , cid)
+    name = message.document.file_name
+    step = user_step[cid]
+    _,exam_id = step.split('_')
+    exam_id = int(exam_id)
+    if check_excel_file(name):
+    
+        file_info = bot.get_file(message.document.file_id)
+        downloaded_file = bot.download_file(file_info.file_path)
+        file_name = f'{cid}-{str(time.time()).replace('.' , '')}.xlsx'
+        saved_file_directory = os.path.join('excel_files' , 'data' , file_name)
+
+        with open(saved_file_directory , 'wb') as f:
+            f.write(downloaded_file)
+        user_id = find_user_id(cid)['ID']
+        status = get_data_from_excel_exam(saved_file_directory , user_id , exam_id)
+        if  status == True:
+            bot.send_message(cid , text['questionsaddedexam'])
+        elif status.startswith('ERROR'): # should be tested 
+            _,error_type = status.split('-')
+            if error_type == 'readexcel':
+                bot.send_message(cid , text['errorinreadingfile'])
+            else :
+                line = error_type[4:]
+                if line != '1':
+                    bot.send_message(cid , text['errorinlineexam'] + '\n' + f'line : {line}' + '\n\n' + text['correctedfile'])
+                else :
+                    bot.send_message(cid , text['firstlineerror'])
+    else :
+        bot.send_message(cid , text['wrongfile'])
+
+@bot.message_handler(content_types=['document'] , func = lambda m : user_step.get(m.chat.id , '') == 'get_question_document')
+def add_multiple_question_handler(message):
+    cid = message.chat.id
+    if is_spam(cid) : 
+        return 
+    manage_user(message , cid)
+    name = message.document.file_name
+    if check_excel_file(name):
+
+        file_info = bot.get_file(message.document.file_id)
+        downloaded_file = bot.download_file(file_info.file_path)
+        file_name = f'{cid}-{str(time.time()).replace('.' , '')}.xlsx'
+        saved_file_directory = os.path.join('excel_files' , 'data' , file_name)
+        
+        with open(saved_file_directory , 'wb') as f:
+            f.write(downloaded_file)
+        user_id = find_user_id(cid)['ID']
+        status = get_data_from_excel_quiz(saved_file_directory , user_id)
+        if  status == True:
+            bot.send_message(cid , text['questionsadded'])
+        elif status.startswith('ERROR'): # should be tested 
+            _,error_type = status.split('-')
+            if error_type == 'readexcel':
+                bot.send_message(cid , text['errorinreadingfile'])
+            else :
+                line = error_type[4:]
+                if line != '1':
+                    bot.send_message(cid , text['errorinline'] + '\n' + f'line : {line}' + '\n\n' + text['correctedfile'])
+                else :
+                    bot.send_message(cid , text['firstlineerror'])
+    else :
+        bot.send_message(cid , text['wrongfile'])
 
 # ---------------
+
+@bot.message_handler(func = lambda m : m.text == Button['guideformultipleques'])
+def send_guide_handler(message):
+    cid = message.chat.id
+    if is_spam(cid) :
+                return 
+    manage_user(message , cid)
+    if (cid not in teachers) and (cid not in admins):
+        markup = create_teacher_panel(cid)
+        bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['help'] , reply_markup=markup) 
+    bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['guideforexcelQ'])
+    with open(os.path.join('excel_files' , 'sample.xlsx') , 'rb') as f:
+        bot.send_document(cid , f)
+    data = get_categories()
+    if create_category_excel(data):
+        with open(os.path.join('excel_files' , 'category.csv') , 'rb') as f:
+            bot.send_document(cid , f)
+
+@bot.message_handler(func = lambda m : m.text == Button['showphotoid'])
+def show_photo_id_handler(message):
+    cid = message.chat.id
+    if is_spam(cid) :
+            return 
+    manage_user(message , cid)
+    if (cid not in teachers) and (cid not in admins):
+        markup = create_teacher_panel(cid)
+        bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['help'] , reply_markup=markup) 
+    bot.send_message(cid , text['getimage'])
+    user_step.setdefault(cid , '')
+    user_step[cid] = 'get_image_id'
+
+@bot.message_handler(content_types=['photo' , 'document' , 'text']\
+                     ,func = lambda m : user_step.get(m.chat.id , '_') == 'get_image_id')
+def send_photo_id(message):
+    cid = message.chat.id
+    if is_spam(cid) :
+            return 
+    manage_user(message , cid)
+    if (cid not in teachers) and (cid not in admins):
+        markup = create_teacher_panel(cid)
+        bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['help'] , reply_markup=markup) 
+    if message.content_type == 'photo':
+        file_list = message.photo
+        photo = file_list[-1]
+        file_id = photo.file_id
+        bot.send_message(cid , 'Photo ID :' + '\n\n' + file_id)
+    else :
+        bot.send_message(cid , text['wrongfile'])
 
 # Teacher Request ------------------------------------
 
@@ -956,7 +1344,7 @@ def getting_ctgy_name(message):
     bot.send_message(cid , f'added to \nquiz.categories\nid = {last_id}' , reply_to_message_id=message.message_id)  
     user_step.pop(cid)
 
-# -------------------------------------------- add question Teacher
+# -------------------------------------------- add ONE question Teacher (quiz or exam)
 
 @bot.message_handler(func=lambda m: m.text in ['/addquestion', Button['addquestion']])
 def choice_category_handler(message):
@@ -972,6 +1360,8 @@ def choice_category_handler(message):
     markup = create_inlinekeyboard_for_categoris(data , 0)
     bot.send_message(cid , text['choice_category_admin'] , reply_markup=markup)   
 
+# user_step[cid] == f'addquestion_{category_id}_{exam_id}'
+
 @bot.message_handler(content_types=['text' , 'photo']
                     ,func = lambda m : (user_step.get(m.chat.id , '_')).startswith('addquestion'))
 def get_question_handler(message):
@@ -979,7 +1369,10 @@ def get_question_handler(message):
     if is_spam(cid) : 
         return
     manage_user(message , cid)
-    _,category_id = (user_step[cid]).split('_')
+    if user_panel.get(cid , '_') == ADDAQUESTIONEXAM:
+        _,category_id,exam_id = (user_step[cid]).split('_')
+    else :
+        _,category_id = (user_step[cid]).split('_')
     category_id = int(category_id)
     if message.content_type == 'photo' :
         file_list = message.photo
@@ -990,14 +1383,24 @@ def get_question_handler(message):
         admin_question[cid].setdefault('file_id' , file_id)
         admin_question[cid].setdefault('text' , message.caption)
         print(admin_question)
-        user_step[cid] = f'getoption1_{category_id}'
+
+        if user_panel.get(cid , '_') == ADDAQUESTIONEXAM:
+            user_step[cid] = f'getoption1_{category_id}_{exam_id}'
+        else :
+            user_step[cid] = f'getoption1_{category_id}'
+
     elif message.content_type == 'text' : 
         admin_question.setdefault(cid , dict())
         admin_question[cid].setdefault('text' , message.text)
         admin_question[cid].setdefault('file_id' , None)
         print(admin_question)
-        user_step[cid] = f'getoption1_{category_id}'
-    bot.send_message(cid , text['get_option1'])
+
+        if user_panel.get(cid , '_') == ADDAQUESTIONEXAM:
+            user_step[cid] = f'getoption1_{category_id}_{exam_id}'
+        else : 
+            user_step[cid] = f'getoption1_{category_id}'
+
+        bot.send_message(cid , text['get_option1'])
 
 @bot.message_handler(func = lambda m : (user_step.get(m.chat.id , '_')).startswith('getoption1'))
 def get_option1_handler(message):
@@ -1005,11 +1408,19 @@ def get_option1_handler(message):
     if is_spam(cid) : 
         return
     manage_user(message , cid)
-    _,category_id = (user_step[cid]).split('_')
+    if user_panel.get(cid , '_') == ADDAQUESTIONEXAM:
+        _,category_id,exam_id = (user_step[cid]).split('_')
+    else :
+        _,category_id = (user_step[cid]).split('_')
     category_id = int(category_id)
     admin_question[cid].setdefault('option1' , message.text)
     print(admin_question)
-    user_step[cid] = f'getoption2_{category_id}'
+
+    if user_panel.get(cid , '_') == ADDAQUESTIONEXAM:
+        user_step[cid] = f'getoption2_{category_id}_{exam_id}'
+    else : 
+        user_step[cid] = f'getoption2_{category_id}'
+
     bot.send_message(cid , text['get_option2'])
 
 @bot.message_handler(func = lambda m : (user_step.get(m.chat.id , '_')).startswith('getoption2'))
@@ -1018,11 +1429,19 @@ def get_option2_handler(message):
     if is_spam(cid) : 
         return
     manage_user(message , cid)
-    _,category_id = (user_step[cid]).split('_')
+    if user_panel.get(cid , '_') == ADDAQUESTIONEXAM:
+            _,category_id,exam_id = (user_step[cid]).split('_')
+    else :
+        _,category_id = (user_step[cid]).split('_')
     category_id = int(category_id)
     admin_question[cid].setdefault('option2' , message.text)
     print(admin_question)
-    user_step[cid] = f'getoption3_{category_id}'
+
+    if user_panel.get(cid , '_') == ADDAQUESTIONEXAM:
+        user_step[cid] = f'getoption3_{category_id}_{exam_id}'
+    else : 
+        user_step[cid] = f'getoption3_{category_id}'
+
     bot.send_message(cid , text['get_option3'])
 
 @bot.message_handler(func = lambda m : (user_step.get(m.chat.id , '_')).startswith('getoption3'))
@@ -1031,11 +1450,19 @@ def get_option1_handler(message):
     if is_spam(cid) : 
         return
     manage_user(message , cid)
-    _,category_id = (user_step[cid]).split('_')
+    if user_panel.get(cid , '_') == ADDAQUESTIONEXAM:
+                _,category_id,exam_id = (user_step[cid]).split('_')
+    else :
+        _,category_id = (user_step[cid]).split('_')
     category_id = int(category_id)
     admin_question[cid].setdefault('option3' , message.text)
     print(admin_question)
-    user_step[cid] = f'getoption4_{category_id}'
+
+    if user_panel.get(cid , '_') == ADDAQUESTIONEXAM:
+        user_step[cid] = f'getoption4_{category_id}_{exam_id}'
+    else : 
+        user_step[cid] = f'getoption4_{category_id}'
+
     bot.send_message(cid , text['get_option4'])
 
 @bot.message_handler(func = lambda m : (user_step.get(m.chat.id , '_')).startswith('getoption4'))
@@ -1044,11 +1471,19 @@ def get_option1_handler(message):
     if is_spam(cid) : 
         return
     manage_user(message , cid)
-    _,category_id = (user_step[cid]).split('_')
+    if user_panel.get(cid , '_') == ADDAQUESTIONEXAM:
+        _,category_id,exam_id = (user_step[cid]).split('_')
+    else :
+        _,category_id = (user_step[cid]).split('_')
     category_id = int(category_id)
     admin_question[cid].setdefault('option4' , message.text)
     print(admin_question)
-    user_step[cid] = f'optionans_{category_id}'
+
+    if user_panel.get(cid , '_') == ADDAQUESTIONEXAM:
+        user_step[cid] = f'optionans_{category_id}_{exam_id}'
+    else : 
+        user_step[cid] = f'optionans_{category_id}'
+
     bot.send_message(cid , text['get_optionanswer'])
 
 @bot.message_handler(func = lambda m : (user_step.get(m.chat.id , '_')).startswith('optionans'))
@@ -1057,14 +1492,22 @@ def get_option1_handler(message):
     if is_spam(cid) : 
         return
     manage_user(message , cid)
-    _,category_id = (user_step[cid]).split('_')
+    if user_panel.get(cid , '_') == ADDAQUESTIONEXAM:
+        _,category_id,exam_id = (user_step[cid]).split('_')
+    else :
+        _,category_id = (user_step[cid]).split('_')
     category_id = int(category_id)
     admin_question[cid].setdefault('option_answer' , int(message.text))
     print(admin_question)
-    user_step[cid] = f'textans_{category_id}'
+
+    if user_panel.get(cid , '_') == ADDAQUESTIONEXAM:
+        user_step[cid] = f'textans_{category_id}_{exam_id}'
+    else : 
+        user_step[cid] = f'textans_{category_id}'
+
     bot.send_message(cid , text['get_textanswer'])
 
-@bot.message_handler(content_types= ['text' , 'photo'],
+@bot.message_handler(content_types = ['text' , 'photo'],
                      func = lambda m : (user_step.get(m.chat.id , '_')).startswith('textans'))
 def get_option1_handler(message):
     print('hello')
@@ -1072,8 +1515,14 @@ def get_option1_handler(message):
     if is_spam(cid) : 
         return
     manage_user(message , cid)
-    _,category_id = (user_step[cid]).split('_')
-    category_id = int(category_id)
+    if user_panel.get(cid , '_') == ADDAQUESTIONEXAM:
+        _,category_id,exam_id = (user_step[cid]).split('_')
+        category_id = int(category_id)
+        exam_id = int(exam_id)
+    else :
+        _,category_id = (user_step[cid]).split('_')
+        category_id = int(category_id)
+
     if message.content_type == 'text' :
         admin_question[cid].setdefault('text_answer' , message.text)
     elif message.content_type == 'photo' :
@@ -1083,20 +1532,54 @@ def get_option1_handler(message):
         admin_question[cid].setdefault('text_answer' , 'isphoto' + file_id)
     print(admin_question)
     user_id_in_table = find_user_id(cid)
-    add_question(   category_id = category_id,
-                    designer_id = user_id_in_table['ID'],
-                    photo_id    = admin_question[cid]['file_id'],
-                    text        = admin_question[cid]['text'],
-                    op1         = admin_question[cid]['option1'],
-                    op2         = admin_question[cid]['option2'],
-                    op3         = admin_question[cid]['option3'],
-                    op4         = admin_question[cid]['option4'],
-                    ansop       = admin_question[cid]['option_answer'],
-                    anstext     = admin_question[cid]['text_answer'] )
+
+    if user_panel.get(cid , '_') == ADDAQUESTIONEXAM:
+        last_row_id = add_question(   category_id = category_id,
+                        designer_id = user_id_in_table['ID'],
+                        photo_id    = admin_question[cid]['file_id'],
+                        text        = admin_question[cid]['text'],
+                        op1         = admin_question[cid]['option1'],
+                        op2         = admin_question[cid]['option2'],
+                        op3         = admin_question[cid]['option3'],
+                        op4         = admin_question[cid]['option4'],
+                        ansop       = admin_question[cid]['option_answer'],
+                        anstext     = admin_question[cid]['text_answer'],
+                        is_public   = False)
+        add_question_to_exam(question_id=last_row_id , exam_id=exam_id)
+        bot.send_message(cid , text['questoin_added_to_exam'])
+        admin_question.pop(cid)
+        user_step.pop(cid)
+        user_panel[cid] = EXAM_PANEL
+
+    else :
+        add_question(   category_id = category_id,
+                        designer_id = user_id_in_table['ID'],
+                        photo_id    = admin_question[cid]['file_id'],
+                        text        = admin_question[cid]['text'],
+                        op1         = admin_question[cid]['option1'],
+                        op2         = admin_question[cid]['option2'],
+                        op3         = admin_question[cid]['option3'],
+                        op4         = admin_question[cid]['option4'],
+                        ansop       = admin_question[cid]['option_answer'],
+                        anstext     = admin_question[cid]['text_answer'] )
     
-    bot.send_message(cid , text['questoin_added'])
-    admin_question.pop(cid)
-    user_step.pop(cid)
+        bot.send_message(cid , text['questoin_added'])
+        admin_question.pop(cid)
+        user_step.pop(cid)
+
+
+@bot.message_handler(content_types=['document'] \
+                     , func = lambda m : user_panel.get(m.chat.id , False) == GENERAL_QUIZ_PANEL)
+def add_multiple_question_handler(message):
+    cid = message.chat.id
+    if is_spam(cid) : 
+            return
+    manage_user(message , cid)
+    file_name = message.document.file_name
+    if check_excel_file(file_name):
+        pass
+    else :
+        bot.send_message(cid , text['wrongfile'])
 
 
 # -------------------------------------------- report Question
@@ -1245,6 +1728,7 @@ def every_messages_handler(message):
 
 get_admins()
 get_teachers()
-print('bot is running !')
+print('bot is running !' , os.getcwd() , sep = ' ---> ')
+
 #skip_pending=True
 bot.infinity_polling()

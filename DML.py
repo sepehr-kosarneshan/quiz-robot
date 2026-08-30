@@ -208,8 +208,69 @@ def edit_question_option4(question_id , new_op4):
     connection.close()
     return True
 
+# exam management ---------
+
+def create_exam(name , designer_id , time , code , is_active = 0):
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor()
+    SQL_QUERY = '''
+        INSERT INTO exam (`name` , `special_code` , `designer_id` , `is_active` , `time`)
+        VALUES (%s , %s , %s , %s , %s)
+    '''
+    cur.execute(SQL_QUERY , (name , code , designer_id , is_active , time))
+    result = cur.lastrowid
+    connection.commit()
+    cur.close()
+    connection.close()
+    return result
+
+def deactive_exam(exam_id):
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor()
+    SQL_QUERY = 'UPDATE exam SET `is_active` = 0 WHERE `id` = (%s)'
+    cur.execute(SQL_QUERY , (exam_id ,))
+    connection.commit()
+    cur.close()
+    connection.close()
+    return True
+
+def active_exam(exam_id):
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor()
+    SQL_QUERY = 'UPDATE exam SET `is_active` = 1 WHERE `id` = (%s)'
+    cur.execute(SQL_QUERY , (exam_id ,))
+    connection.commit()
+    cur.close()
+    connection.close()
+    return True
+
+def change_time_exam(exam_id , new_time):
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor()
+    SQL_QUERY = 'UPDATE exam SET `time` = (%s) WHERE `id` = (%s)'
+    cur.execute(SQL_QUERY , (new_time,exam_id))
+    connection.commit()
+    cur.close()
+    connection.close()
+    return True
+
+def add_question_to_exam(question_id , exam_id):
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor()
+    SQL_QUERY = '''
+        INSERT INTO exam_questions (`exam_id` , `question_id`) VALUES (%s , %s)
+    '''
+    cur.execute(SQL_QUERY , (exam_id , question_id))
+    result = cur.lastrowid
+    connection.commit()
+    cur.close()
+    connection.close()
+    return result
+
 if __name__ == '__main__' :
-    edit_question_category(2 , 2)
+    print(add_question_to_exam(2 , 1))
+    # active_exam(1)
+    # edit_question_category(2 , 2)
     # add_answer_for_question(1 , 2 , 2)
     # add_teacher_with_tel_id(1454840970)
     #print(add_categories('structure'))

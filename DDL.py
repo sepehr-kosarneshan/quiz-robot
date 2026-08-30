@@ -83,10 +83,11 @@ def create_table_exam():
     cur.execute('''
         CREATE TABLE exam (
             id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(250) NOT NULL,
             special_code VARCHAR(100) NOT NULL UNIQUE,
             designer_id INT UNSIGNED,
-            start_time DATETIME NOT NULL,    
-            end_time DATETIME NOT NULL,   
+            is_active TINYINT NOT NULL DEFAULT 0,
+            time INT UNSIGNED ,
             register_time DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (designer_id) REFERENCES users(id) ON DELETE CASCADE
@@ -103,10 +104,9 @@ def create_table_exam_questions():
 
     cur.execute('''
         CREATE TABLE exam_questions (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             exam_id INT UNSIGNED,
             question_id INT UNSIGNED,
-            time_to_answer INT UNSIGNED NOT NULL DEFAULT 60,
-            PRIMARY KEY (exam_id, question_id),
             FOREIGN KEY (exam_id) REFERENCES exam(id) ON DELETE CASCADE,
             FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
         );''')

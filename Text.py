@@ -11,7 +11,7 @@ text = {
     'exam_creating_command'         : 'شروع آزمون',
     'show_categories'               : 'مشاهده موضوعات',
     'add_question_teacher'          : 'اضافه کردن یک سوال',
-    'add_question_teacher_mul'      : 'اضافه کردن چند سوال با فایل .xlsx',
+    'add_question_teacher_mul'      : 'اضافه کردن چند سوال با .xlsx',
     'add_teacher_admin'             : 'اضافه کردن معلم',
     'add_category_command'          : 'اضافه کردن موضوع',
     'add_category_admin'            : 'نام موضوع مورد نظر را وارد نمایید',
@@ -54,6 +54,12 @@ text = {
     'get_new_option'                : 'متن گزینه جدید را وارد نمایید',
     'get_new_photo'                 : 'عکس جدید صورت سوال را ارسال نمایید',
     'edited_successfully'           : 'سوال مورد نظر در دیتابیس آپدیت شد🟢',
+    'wrongfile'                     : 'فرمت یا نام فایلی که ارسال کرده اید اشتباه است',
+    'getimage'                      : 'عکس مورد نظر را ارسال نمایید',
+    'getfileforquestions'           : 'لطفا فایل اکسل سوالات را ارسال نمایید، پیشنهاد می شود حتما ابتدا راهنمای مربوطه برای ساخت اکسل را مطالعه کنید.',
+    'wrongfile'                     : 'فرمت فایل ارسالی شما اشتباه می باشد',
+    'questionsadded'                : 'سوالات شما با موفقیت در دیتابیس ذخیره شدند',
+    'questionsaddedexam'            : 'سوالات شما با موفقیت به آزمون اضافه شدند.',
     # teacher panel
     'teachpanel'                    : 'پنل معلم 💡',
     'enterteacherpanel'             : 'ورود به پنل معلم 🟢',
@@ -66,6 +72,29 @@ text = {
     'exitcreateexampanel'           : 'خروج از بخش ساخت آزمون جدید 🔴',
     'enterreportpanel'              : 'ورود به پنل کارنامه 🟢',
     'exitreportpanel'               : 'خروج از پنل کارنامه 🔴',
+    # errors 
+    'errorinreadingfile'            : 'در خواندن اکسل مشکلی پیش آمده است',
+    'errorinline'                   : 'در خواندن سطر زیر مشکلی پیش آمده است ولی سطر های قبلی با موفقیت در دیتابیس قرار گرفته اند.',
+    'errorinlineexam'               : 'در خواندن سطر زیر مشکلی پیش آمده است ولی سطر های قبلی با موفقیت به آزمون اضافه شدند.',
+    'correctedfile'                 : 'لطفا فایل را اصلاح کرده و سطر های قبلی که به دیتابیس اضافه شده اند را پاک نماییید',
+    'firstlineerror'                : 'در خواندن سطر اول فایل اکسل مشکلی پیش آمده است لطفا فایل را اصلاح و دوباره ارسال بفرمایید.',
+    'noexamhere'                    : 'شما هنوز آزمونی نساخته اید',
+    # -------------- create exam
+    'enterexamname'                 : 'لطفا اسم آزمون را وارد نمایید، ترجیحا یک اسم کامل و جامع به کار ببرید.',
+    'getexamtime'                   : 'مدت زمان مد نظر برای آزمون را به دقیقه و به زبان انگلیسی وارد نمایید.',
+    # -------------- exam manage
+    'specialcodeget'                : '🔐کد ورود به آزمون',
+    'questioncount'                 : '📝تعداد سوال',
+    'success'                       : 'عملیات با موفقیت انجام شد',
+    'activate'                      : 'فعال سازی',
+    'deactivate'                    : 'غیر فعال سازی',
+    'timechange'                    : '🕐تغییر تایم آزمون',
+    'examaddonequestion'            : '💡افزودن یک سوال به آزمون',
+    'examaddmulquestion'            : '💡افزودن چند سوال با فایل .xlsx',
+    'examtimechanging'              : 'لطفا مدت زمان آزمون را به دقیقه وارد نمایید',
+    'wrongvaluefortime'             : 'لطفا یک مقدار معتبر برای تایم آزمون وارد نمایید',
+    'questoin_added_to_exam'        : 'سوال مورد نظر با موفقیت به آزمون اضافه شد',
+    'deletemessage'                 : '🗑️',
 }
 
 
@@ -88,12 +117,14 @@ Button = {
     'addcategory'           : text['add_category_command']      + '⚡',
     'showcategory'          : text['show_categories']           + 'ℹ️',
     'req_teacher'           : text['request_teacher']           + '🧑‍🏫',
+    # -------------
+    'guideformultipleques'  : 'دریافت راهنما و فایل نمونه برای اکسل سوالات' + '💡',
     'generalquizpanel'      : 'افزودن سوال به بخش کوئیز'      + '✅',
     'exammanagement'        : 'ورود به پنل مدیریت آزمون'      + '✅',
     'exitgeneralquizpanel'  : 'خروج از بخش کوئیز'             + '❌',
     'exitexammanagement'    : 'خروج از بخش مدیریت آزمون'      + '❌',
     # -------------
-    'showexams'             : 'مشاهده آزمون ها 💡',
+    'showexams'             : 'مدیریت آزمون و افزودن سوال 💡',
     'createexam'            : 'ساخت آزمون جدید  🧪',
     'exitcreateexam'        : 'خروج از پنل ساخت آزمون جدید ❌',
     # -------------
@@ -104,5 +135,6 @@ Button = {
     'exitreportpanel'       : 'خروج از پنل کارنامه ❌',
     'quizreport'            : 'مشاهده عملکرد در کوئیز ها 📝',
     'examreport'            : 'مشاهده عملکرد در آزمون ها 📝',
+    'showphotoid'           : 'دریافت شناسه عکس' + 'ℹ️',
     # ---------------
 }
