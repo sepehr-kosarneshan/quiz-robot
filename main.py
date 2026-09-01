@@ -4,7 +4,7 @@ from requests_forwarder import setup_proxy
 from config_bot import *
 from config_db import *
 import os
-import datetime,time
+import time
 import random
 from Text import *
 from DQL import *
@@ -54,6 +54,7 @@ CHANNEL_MESSAGES = {
     'guideforexcelQ'    : 18,
     'showexamsandmanage': 20,
     'guideformanageexam': 22,
+    'textforspecialcode': 24,
 }
 
 EDIT_QUESTION_PAGES = [
@@ -81,6 +82,7 @@ ADDAQUESTIONEXAM = 3
 user_panel = {} # cid : panel
 admin_question = {} # cid : {text : ... , file_id : ... , options : ... , answer_option : ... , answer_text : ...}
 teacher_exam = {} # cid : {name : ... , time : ...}
+exam_cid_time = {} # exam_id : [{cid : start_time} , ...]
 # ----- spam
 lower_limit = 2     # sec
 upper_limit = 15    # sec
@@ -94,7 +96,7 @@ admins = []
 question_count = 1 # for public quiz
 
 def generate_exam_special_code(length = 7):
-    characters = "ABCDEFGHJKMNPQRSTUVWXYZ23456789!@*&"
+    characters = "ABCDEFGHJKMNPQRSTUVWXYZ23456789!*&%$#"
     return "".join(secrets.choice(characters) for _ in range(length))
 
 def get_admins():
@@ -247,8 +249,8 @@ def create_exam_management_panel(cid):
 
 def create_report_panel(cid):
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
-    keyboard.add(Button['quizreport']) # inline 
-    keyboard.add(Button['examreport']) # inline 
+    keyboard.add(Button['quizreport']) 
+    keyboard.add(Button['examreport'])  
     keyboard.add(Button['exitreportpanel'],Button['support'])
     return keyboard
 # ---------------
@@ -261,10 +263,38 @@ def create_category_excel(data): # data : DQL.get_categories() in excel_files fo
         f.write(result)
     return True
 
+# report ------------------
 
 def create_report_quiz(cid): # working here ... 
+    db_data = get_report_quiz_from_telegram_id(cid)
+    report_dict = {} # 'category_name' : {true : ... , false : ...}
+    for item in db_data:
+        category_name = item['category_name']
+        report_dict.setdefault(category_name , {'true' : 0 , 'false' : 0})
+        if item['answer_option'] == item['selected_option']:
+            report_dict[category_name]['true'] += 1
+        else :
+            report_dict[category_name]['false'] += 1
+    result_text = text['reporttextquiz'] + '\n\n'
+    print(report_dict)
+    for key in report_dict.keys():
+        value = report_dict[key]
+        percent = (100 * value['true'])/(value['true'] + value['false'])
+        result_text += f'__{key}__\n'
+        result_text += text['correct'] + '\n'
+        result_text += str(value['true']) + '\n'
+        result_text += text['false'] + '\n'
+        result_text += str(value['false']) + '\n'
+        result_text += text['percent'] + '\n'
+        result_text += f'*{clean_text_for_markdown(str(round(percent , 3)))}%*\n\n'
+        result_text += clean_text_for_markdown('---------------------------------\n')
+    return result_text.strip(clean_text_for_markdown('---------------------------------'))
+                
+
+def create_report_exam(cid , exam_id): #working here 
     pass
 
+# ---------------------
 
 def category_pages(clist) : # clist : DQL.get_categories()
     result = []
@@ -361,13 +391,116 @@ def create_inlinekeyboard_for_teacher_request(cid , mid , answer = True , addtea
     markup.add(button3)
     return markup
 
-def create_list_quiz_public(category_id , question_count): # random , output : list of id(s)
+# ---------------
+
+def create_list_question_exam(cid , exam_id):
+    data = get_list_of_question_in_exam(exam_id)
+    question_list = []
+    for item in data:
+        question_list.append(item['qid'])
+    random.seed(cid)
+    random.shuffle(question_list)
+    return question_list
+
+def create_list_quiz_public(category_id , question_count): # working here ...
     list_of_ids = get_question_id_public(category_id=category_id)
     try :
         list_of_ids = random.sample(list_of_ids , k = question_count)
     except :
         return False
     return list_of_ids
+
+def create_text_caption_for_question(question_id):
+    info = get_question_information(question_id=question_id)
+    question_text = info['text']
+    option_1 = info['option_1']
+    option_2 = info['option_2']
+    option_3 = info['option_3']
+    option_4 = info['option_4']
+    result = question_text + '\n\n'
+    result += '✅' + text['options'] + '✅' + '\n\n'
+    result += f'{option_sticker['1']} : {option_1}\n\n'
+    result += f'{option_sticker['2']} : {option_2}\n\n'
+    result += f'{option_sticker['3']} : {option_3}\n\n'
+    result += f'{option_sticker['4']} : {option_4}\n'
+    return result
+
+# enter exam -------------------------------------------
+
+def create_inline_for_exam(exam_id , question_index , cid , next = True):
+    '''
+        question_index : index of id in create_list_question_exam(exam_id , cid)
+        0 =< question_index  < len(create_list_question_exam(exam_id , cid)) and starts at zero
+    '''
+    next_var = 1
+    if next == False:
+        next_var = 0
+    data = create_list_question_exam(cid , exam_id)
+    if len(data) == 0:
+        return False
+    markup = InlineKeyboardMarkup()
+    Buttons = [InlineKeyboardButton(option_sticker['1'] , callback_data = f'examop_1_{question_index}_{exam_id}_{next_var}') ,\
+               InlineKeyboardButton(option_sticker['2'] , callback_data = f'examop_2_{question_index}_{exam_id}_{next_var}') ,\
+               InlineKeyboardButton(option_sticker['3'] , callback_data = f'examop_3_{question_index}_{exam_id}_{next_var}'),\
+               InlineKeyboardButton(option_sticker['4'] , callback_data = f'examop_4_{question_index}_{exam_id}_{next_var}')]
+    
+    markup.add(Buttons[0] , Buttons[1])
+    markup.add(Buttons[2] , Buttons[3])
+    if next_var == 1:        
+        right_button = InlineKeyboardButton(text['nextquestionexam'] , callback_data=f'examquestionselect_{question_index + 1}_{exam_id}')
+        if question_index != len(data) - 1:
+            markup.add(right_button)
+
+    markup.add(InlineKeyboardButton(text['endexamtime'] , callback_data = f'endtimeexam_{exam_id}_{cid}'))
+    return markup
+
+def create_inline_for_answered_in_exam(user_choice , exam_id , question_index , cid , next = True):
+    data = create_list_question_exam(cid , exam_id)
+    next_var = 1
+    if next == False:
+        next_var = 0
+    else :
+        if question_index == len(data) - 1:
+            next_var = 0
+    markup = InlineKeyboardMarkup()
+    options = ['1' , '2' , '3' , '4']
+    for i in range(len(options)):
+        if str(user_choice) == options[i]:
+            options[i] += 'u'
+    Buttons = []
+    for i in range(len(options)):
+        data = f'examop_{options[i][0]}_{question_index}_{exam_id}_{next_var}'
+        text_option = option_sticker[str(options[i][0])]
+        if 'u' in options[i]:
+            Buttons.append(InlineKeyboardButton(text_option , callback_data = data , style='primary'))
+        else :
+            Buttons.append(InlineKeyboardButton(text_option , callback_data = data))
+    markup.add(Buttons[0] , Buttons[1])
+    markup.add(Buttons[2] , Buttons[3])
+
+    if next_var == 1:
+        right_button = InlineKeyboardButton(text['nextquestionexam'] , callback_data=f'examquestionselect_{question_index + 1}_{exam_id}')
+        if question_index != len(data) - 1:
+            markup.add(right_button)
+
+    markup.add(InlineKeyboardButton(text['endexamtime'] , callback_data = f'endtimeexam_{exam_id}_{cid}'))
+
+    return markup
+
+def send_question_exam(cid , question_index , exam_id , markup):
+    data = create_list_question_exam(cid , exam_id)
+    if len(data) == 0:
+        return False
+    info = get_question_information(question_id = data[question_index])
+    photo_id = info['photo_id']
+    result = create_text_caption_for_question(data[question_index])
+    if photo_id is not None : 
+        message = bot.send_photo(cid , photo_id , caption=result , reply_markup=markup)
+    else :
+        message = bot.send_message(cid , result , reply_markup=markup)
+    return message 
+
+# ------------------------
 
 def create_inline_for_answered_option(user_choice ,correct_option , question_id , mid):
     markup = InlineKeyboardMarkup()
@@ -393,11 +526,12 @@ def create_inline_for_answered_option(user_choice ,correct_option , question_id 
         else :
             text_option = option_sticker[str(options[i][0])]
             Buttons.append(InlineKeyboardButton(text_option , callback_data='None'))
-    markup.add(Buttons[0] , Buttons[1] , Buttons[2] , Buttons[3])
+    markup.add(Buttons[0] , Buttons[1])
+    markup.add(Buttons[2] , Buttons[3])
     markup.add(InlineKeyboardButton(text['get_answer_for_question'] , callback_data=f'getanswer_{mid}_{question_id}' , style='primary'))
     markup.add(InlineKeyboardButton(text['delete_question'] , callback_data=f'deletequestion'))
     return markup
-    
+
 def create_inline_for_options(question_id):
     markup = InlineKeyboardMarkup()
     Buttons = [InlineKeyboardButton(option_sticker['1'] , callback_data = f'option_1_{question_id}') ,\
@@ -406,24 +540,10 @@ def create_inline_for_options(question_id):
             InlineKeyboardButton(option_sticker['4'] , callback_data = f'option_4_{question_id}'),\
             InlineKeyboardButton(text['delete_question'] , callback_data=f'deletequestion')]
 
-    markup.add(Buttons[0] , Buttons[1] , Buttons[2] , Buttons[3])
+    markup.add(Buttons[0] , Buttons[1])
+    markup.add(Buttons[2] , Buttons[3])
     markup.add(Buttons[4])
     return markup
-
-def create_text_caption_for_question(question_id):
-    info = get_question_information(question_id=question_id)
-    question_text = info['text']
-    option_1 = info['option_1']
-    option_2 = info['option_2']
-    option_3 = info['option_3']
-    option_4 = info['option_4']
-    result = question_text + '\n\n'
-    result += '✅' + text['options'] + '✅' + '\n\n'
-    result += f'{option_sticker['1']} : {option_1}\n\n'
-    result += f'{option_sticker['2']} : {option_2}\n\n'
-    result += f'{option_sticker['3']} : {option_3}\n\n'
-    result += f'{option_sticker['4']} : {option_4}\n'
-    return result
 
 def create_inline_for_edit_question(question_id , page): # page 0 or 1
     markup = InlineKeyboardMarkup()
@@ -439,7 +559,7 @@ def create_inline_for_edit_question(question_id , page): # page 0 or 1
         return False
     return markup
 
-def send_question(cid , question_id):
+def send_question_quiz(cid , question_id):
     info = get_question_information(question_id=question_id)
     photo_id = info['photo_id']
     markup = create_inline_for_options(question_id=question_id)
@@ -456,6 +576,23 @@ def create_text_for_exam_data(id):
     result = f'ℹ️ Information ℹ️\n✅ID : {data['id']}\n✅Name : {data['name']}\n✅Special Code : {data['special_code']}\n✅Active : {active}\n✅Time : {data['time']} minutes'
     return result 
 
+def clean_text_for_markdown(text_):
+    result = ''
+    for char in text_ :
+        if char in r'_*[]()~`>#+-=|{}.!\'\\':
+            result += fr'\{char}'
+        else :
+            result += char
+    return result
+
+def create_text_for_exam_code(code , exam_name):
+    clean_code = clean_text_for_markdown(code)
+    clean_exam_name = clean_text_for_markdown(exam_name)
+    result = text['createtextforcode']
+    result += f'\n__{clean_exam_name}__'
+    result += f'\n\n||{clean_code}||'
+    return result
+
 def create_inline_manage_exam(id):
     '''
         id --> exam id
@@ -471,7 +608,8 @@ def create_inline_manage_exam(id):
     markup.add(InlineKeyboardButton(text['examaddonequestion'] , callback_data=f'examaddone_{id}'))
     markup.add(InlineKeyboardButton(text['examaddmulquestion'] , callback_data=f'examaddmul_{id}'))
     markup.add(InlineKeyboardButton(text['questioncount'] , callback_data=f'getcountquestion_{id}' , style='primary'),\
-               InlineKeyboardButton(text['specialcodeget'] , callback_data=f'getspecialcode_{id}' , style = 'primary'))
+               InlineKeyboardButton(text['specialcodeget'] , callback_data=f'getspecialcode_{id}' , style = 'primary'))        
+    markup.add(InlineKeyboardButton('🗑️' , callback_data = 'deletemessage'))
     return markup
 
 def create_page_list_for_exams(data):
@@ -642,7 +780,7 @@ def callback_handler(call):
         category_id = int(category_id)
         list_id = create_list_quiz_public(category_id=category_id , question_count=question_count)
         for i in list_id : 
-            send_question(cid , i)
+            send_question_quiz(cid , i)
         bot.answer_callback_query(call_id , text['category_choice_callanswe'])
 
     elif data.startswith('chpagequiz'):
@@ -784,10 +922,15 @@ def callback_handler(call):
         bot.answer_callback_query(call_id , 'page changed')
 
     # -------------------- exam management
-    elif data.startswith('specialcodeget'):
-        # working here
-        pass 
-
+    elif data.startswith('getspecialcode'):
+        _,exam_id = data.split('_')
+        exam_id = int(exam_id)
+        data = get_exam_data_id(exam_id)
+        code = data['special_code']
+        name = data['name']
+        bot.send_message(cid , create_text_for_exam_code(code , name) , parse_mode='MarkdownV2' , reply_to_message_id=mid)
+        bot.answer_callback_query(call_id , 'exam code')
+    
     elif data.startswith('getcountquestion'):
         _,exam_id = data.split('_')
         exam_id = int(exam_id)
@@ -857,8 +1000,60 @@ def callback_handler(call):
         bot.send_message(cid , result , reply_markup=markup)
         bot.answer_callback_query(call_id , 'show data')
 
-    # -------------
+    # ------------- enter exam callback handlers
     
+    elif data.startswith('examop'):
+        # working here ...
+        print(data)
+        _,selected_option,qindex,exam_id,next_var = data.split('_')
+        qindex = int(qindex)
+        data = create_list_question_exam(cid , exam_id)
+        qid = data[qindex]
+        selected_option = int(selected_option)
+        exam_id = int(exam_id)
+        next_var = int(next_var)
+        user_id = find_user_id(cid)['ID']
+
+        if is_answered_in_exam(user_id , exam_id ,qid):
+            if selected_option != what_option_answered_in_exam(user_id , qid , exam_id):
+                update_option_in_exam(user_id , qid , selected_option , exam_id)
+        else :
+            add_answer_for_question(user_id , qid , selected_option , exam_id)  
+
+        if next_var == 1:
+            new_markup = create_inline_for_answered_in_exam(selected_option , exam_id , qindex , cid)
+        else :
+            new_markup = create_inline_for_answered_in_exam(selected_option , exam_id , qindex , cid , next=False)
+
+        try :
+            bot.edit_message_reply_markup(cid , mid , reply_markup = new_markup)
+        except :
+            pass
+        bot.answer_callback_query(call_id , 'question answered')
+        
+
+    elif data.startswith('examquestionselect'):
+        # working here ... 
+        _,new_index,exam_id = data.split('_')
+        new_index = int(new_index)
+        exam_id = int(exam_id)
+        data = create_list_question_exam(cid , exam_id)
+        question_id = data[new_index]
+        user_id = find_user_id(cid)['ID']
+        new_markup = create_inline_for_exam(exam_id , new_index , cid)
+        if is_answered_in_exam(user_id , exam_id , question_id):
+            option = what_option_answered_in_exam(find_user_id(cid)['ID'] , question_id , exam_id)
+            old_markup = create_inline_for_answered_in_exam(option , exam_id , new_index , cid , next = False)
+        else :
+            old_markup = create_inline_for_exam(exam_id , new_index , cid , next=False)
+
+        bot.edit_message_reply_markup(cid , mid , reply_markup=old_markup)
+        send_question_exam(cid , new_index , exam_id , new_markup)
+        bot.answer_callback_query(call_id , 'question changed')
+
+
+    # ------------------------------------------
+        
     elif data == 'deleteans' or data == 'deletemessage' : 
         bot.delete_message(cid , mid)
         bot.answer_callback_query(call_id , 'message deleted')
@@ -895,18 +1090,37 @@ def start_command_handler(message):
 @bot.message_handler(func = lambda m: m.text == Button['reportpanel'])
 def show_performance_handler(message):
     cid = message.chat.id
+    if is_spam(cid) : 
+            return 
+    manage_user(message , cid)
     markup = create_report_panel(cid)
     bot.send_message(cid , text['enterreportpanel'] , reply_markup=markup)
 
 @bot.message_handler(func = lambda m : m.text == Button['exitreportpanel'])
 def exit_report_panel_handler(message):
     cid = message.chat.id
+    if is_spam(cid) : 
+            return 
+    manage_user(message , cid)
     markup = create_start_keyboard(cid)
     bot.send_message(cid , text['exitreportpanel'] , reply_markup=markup)
     try :
         user_step.pop(cid) 
     except :
         pass   
+
+# ------------------ enter exam
+
+# exam_cid_time = {} # exam_id : [{cid : start_time} , ...]
+
+@bot.message_handler(func = lambda m : m.text == Button['exam'])
+def enter_exam_handler(message):
+    cid = message.chat.id
+    if is_spam(cid) : 
+            return 
+    manage_user(message , cid)
+    markup = create_inline_for_exam(1 , 0 , cid)
+    send_question_exam(cid , 0 , 1 , markup)
 
 # ------------------
 
@@ -1242,6 +1456,19 @@ def send_photo_id(message):
         bot.send_message(cid , 'Photo ID :' + '\n\n' + file_id)
     else :
         bot.send_message(cid , text['wrongfile'])
+
+# report ---------------------------------------------
+
+@bot.message_handler(func = lambda m : m.text == Button['quizreport'])
+def quiz_report_handler(message):
+    cid = message.chat.id
+    if is_spam(cid) :
+            return 
+    manage_user(message , cid)
+    result_text = create_report_quiz(cid)
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton(text['deletemessage'] , callback_data='deletemessage'))
+    bot.send_message(cid , result_text , parse_mode='MarkdownV2',reply_markup=markup)
 
 # Teacher Request ------------------------------------
 
@@ -1592,7 +1819,7 @@ def report_question_handler(message):
     designer_cid = int(designer_cid)
     question_id = int(question_id)
     bot.copy_message(designer_cid , CHANNEL_ID , CHANNEL_MESSAGES['quesiton_report'])
-    sent_msg = send_question(designer_cid , question_id)
+    sent_msg = send_question_quiz(designer_cid , question_id)
     sent_msg_id = sent_msg.message_id
     markup = create_inline_for_edit_question(question_id , 0)
     bot.copy_message(designer_cid , cid , message.message_id , reply_to_message_id=sent_msg_id , reply_markup=markup)

@@ -117,6 +117,19 @@ def add_answer_for_question(user_id , question_id , selected_option , exam_id = 
     connection.close()
     return id
 
+def update_option_in_exam(user_id , question_id , new_option , exam_id):
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor()
+    SQL_QUERY = '''
+        UPDATE user_answers SET `selected_option` = (%s)
+        WHERE `user_id` = (%s) AND `question_id` = (%s) AND `exam_id` = (%s)
+    '''
+    cur.execute(SQL_QUERY , (new_option , user_id , question_id , exam_id))
+    connection.commit()
+    cur.close()
+    connection.close()
+    return True
+
 # Edit Question --------------
 def edit_question_category(question_id , category_id):
     connection = mysql.connector.connect(**config , database = database_name)

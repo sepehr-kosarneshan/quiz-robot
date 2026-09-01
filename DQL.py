@@ -2,6 +2,9 @@ import mysql.connector
 from config_db import *
 
 def find_user_id(telegram_id):
+    '''
+        user_id = find_user_id(cid)['ID']
+    '''
     connection = mysql.connector.connect(**config , database = database_name)
     cur = connection.cursor(dictionary=True)
     SQL_QUERY = 'SELECT `ID` FROM USERS WHERE `telegram_id` = %s'
@@ -118,7 +121,7 @@ def get_report_quiz_from_telegram_id(cid):
     connection = mysql.connector.connect(**config , database = database_name)
     cur = connection.cursor(dictionary=True)
     SQL_QUERY = '''
-        select u.telegram_id , q.id as question_id ,  us.selected_option , q.answer_option 
+        select u.telegram_id , q.id as question_id ,  us.selected_option , q.answer_option , c.name as category_name
         
         from quiz.user_answers as us 
 
@@ -126,6 +129,8 @@ def get_report_quiz_from_telegram_id(cid):
         on us.user_id = u.id 
         inner join quiz.questions as q
         on q.id = us.question_id
+        inner join quiz.categories as c
+        on q.category_id = c.id
 
         where telegram_id = (%s) and us.exam_id is null
     '''
@@ -136,6 +141,42 @@ def get_report_quiz_from_telegram_id(cid):
     return result
 
 # exam section
+
+def what_option_answered_in_exam(user_id , question_id , exam_id):
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor(dictionary=True)
+    SQL_QUERY = '''
+        SELECT selected_option FROM user_answers WHERE user_id = (%s) AND exam_id = (%s) AND question_id = (%s) 
+    '''
+    cur.execute(SQL_QUERY , (user_id , exam_id , question_id))
+    result = cur.fetchone()
+    cur.close()
+    connection.close()
+    return result['selected_option']
+
+def is_answered_in_exam(user_id , exam_id , question_id):
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor(dictionary=True)
+    SQL_QUERY = '''
+        SELECT id FROM user_answers WHERE user_id = (%s) AND exam_id = (%s) AND question_id = (%s) 
+    '''
+    cur.execute(SQL_QUERY , (user_id , exam_id , question_id))
+    result = cur.fetchall()
+    cur.close()
+    connection.close()
+    return len(result) > 0
+    
+def get_list_of_question_in_exam(exam_id):
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor(dictionary=True)
+    SQL_QUERY = '''
+        SELECT question_id AS qid FROM exam_questions WHERE exam_id = (%s) ORDER BY question_id DESC; 
+    '''
+    cur.execute(SQL_QUERY , (exam_id , ))
+    result = cur.fetchall()
+    cur.close()
+    connection.close()
+    return result    
 
 def get_exams_from_user_id(user_id):
     connection = mysql.connector.connect(**config , database = database_name)
@@ -186,7 +227,8 @@ def get_question_count_for_exam(exam_id):
     return len(result)
 
 if __name__ == '__main__':
-    print(is_special_code_exist('1234'))
+    print(what_option_answered_in_exam(7 , 6 , 1))
+    # print(get_report_quiz_from_telegram_id(1454840970)[2])
     # print(find_user_id(1454840970)['ID'])
     # print(find_designer_telegram_id(2))
     # print(is_answered_this_question(2 , 2))
