@@ -11,6 +11,7 @@ from DQL import *
 from DML import *
 from read_excel_file import *
 import secrets
+import threading
 
 setup_proxy(
     proxy_token=proxy_token
@@ -54,7 +55,8 @@ CHANNEL_MESSAGES = {
     'guideforexcelQ'    : 18,
     'showexamsandmanage': 20,
     'guideformanageexam': 22,
-    'textforspecialcode': 24,
+    'guideforenterexam' : 24,
+    'examended'         : 26,
 }
 
 EDIT_QUESTION_PAGES = [
@@ -82,7 +84,9 @@ ADDAQUESTIONEXAM = 3
 user_panel = {} # cid : panel
 admin_question = {} # cid : {text : ... , file_id : ... , options : ... , answer_option : ... , answer_text : ...}
 teacher_exam = {} # cid : {name : ... , time : ...}
-exam_cid_time = {} # exam_id : [{cid : start_time} , ...]
+exam_cid_time = {} # {... , exam_id : {cid : start_time , ... } , ...}
+delete_messages_dict = {} # {(mid , cid) : time to delete , ...}
+
 # ----- spam
 lower_limit = 2     # sec
 upper_limit = 15    # sec
@@ -451,7 +455,7 @@ def create_inline_for_exam(exam_id , question_index , cid , next = True):
         if question_index != len(data) - 1:
             markup.add(right_button)
 
-    markup.add(InlineKeyboardButton(text['endexamtime'] , callback_data = f'endtimeexam_{exam_id}_{cid}'))
+    markup.add(InlineKeyboardButton(text['endexamtime'] , callback_data = f'endtimeexam_{exam_id}'))
     return markup
 
 def create_inline_for_answered_in_exam(user_choice , exam_id , question_index , cid , next = True):
@@ -483,7 +487,7 @@ def create_inline_for_answered_in_exam(user_choice , exam_id , question_index , 
         if question_index != len(data) - 1:
             markup.add(right_button)
 
-    markup.add(InlineKeyboardButton(text['endexamtime'] , callback_data = f'endtimeexam_{exam_id}_{cid}'))
+    markup.add(InlineKeyboardButton(text['endexamtime'] , callback_data = f'endtimeexam_{exam_id}'))
 
     return markup
 
@@ -650,7 +654,81 @@ def create_inline_for_show_exams(data , page = 0):
     else :
         return False
     
-# ----------------------------------
+# --------------------- worker
+
+# exam_cid_time = {} # {... , exam_id : {cid : start_time , ... } , ...}
+
+def check_exam_time():
+    global exam_cid_time
+    delete_id = []
+    for exam_id in exam_cid_time:
+        value = exam_cid_time[exam_id]
+        dt = get_exam_data_id(exam_id)['time'] * 60 # second
+        for cid in value:
+            if value[cid] is not None:
+                now = time.time()
+                if now - value[cid] >= dt:
+                    value[cid] = None
+                    bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['examended'])
+        for cid in value:
+            if value[cid] is not None:
+                break
+        else :
+            delete_id.append(exam_id)
+
+    for id in delete_id:
+        deactive_exam(id)
+        exam_cid_time.pop(id)
+
+def check_cid_in_exam(cid , exam_id):
+    data = exam_cid_time.get(exam_id , False)
+    if data != False:
+        data = data.get(cid , False)
+        if data != False:
+            if data is None :
+                return False
+            else :
+                return True
+        else :
+            return False
+    else :
+        return False
+
+def check_delete_messages_list():
+    # (mid , cid) : time to delete , ...}
+    global delete_messages_dict
+    print(delete_messages_dict)
+    pop_list = [] # mid
+    for cmid in delete_messages_dict:
+        mid,cid = cmid
+        time_to_delete = delete_messages_dict[cmid]
+        now = time.time()
+        if now >= time_to_delete:
+            try : 
+                bot.delete_message(cid , mid)
+            except :
+                pass
+            pop_list.append(cmid)
+    for item in pop_list:
+        delete_messages_dict.pop(item)
+
+def worker(deltatime):
+    while True:
+        # try :
+        check_delete_messages_list()
+        check_exam_time()
+        print(exam_cid_time)
+        time.sleep(deltatime)
+        # except :
+        #     pass
+    
+thread = threading.Thread(
+    target=worker, 
+    args=(2,), 
+    daemon=True
+)
+
+# ---------------------
 
 def listener(messages):
     for m in messages:
@@ -922,6 +1000,7 @@ def callback_handler(call):
         bot.answer_callback_query(call_id , 'page changed')
 
     # -------------------- exam management
+
     elif data.startswith('getspecialcode'):
         _,exam_id = data.split('_')
         exam_id = int(exam_id)
@@ -942,6 +1021,7 @@ def callback_handler(call):
 
     elif data.startswith('examdeactive'):
         _,exam_id = data.split('_')
+        exam_id = int(exam_id)
         deactive_exam(exam_id=exam_id)
         new_text = create_text_for_exam_data(exam_id)
         new_markup = create_inline_manage_exam(exam_id)
@@ -949,6 +1029,15 @@ def callback_handler(call):
         bot.edit_message_text(new_text , cid , mid)
         bot.edit_message_reply_markup(cid , mid , reply_markup = new_markup)
         bot.answer_callback_query(call_id , 'deactive')
+        data = exam_cid_time.get(exam_id , False)
+        if data != False :
+            for cid in data:
+                if data[cid] is not None:
+                    bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['examended'])
+        try :
+            exam_cid_time.pop(exam_id)
+        except :
+            pass
 
     elif data.startswith('examactive'):
         _,exam_id = data.split('_')
@@ -1002,55 +1091,92 @@ def callback_handler(call):
 
     # ------------- enter exam callback handlers
     
-    elif data.startswith('examop'):
-        # working here ...
-        print(data)
-        _,selected_option,qindex,exam_id,next_var = data.split('_')
-        qindex = int(qindex)
-        data = create_list_question_exam(cid , exam_id)
-        qid = data[qindex]
-        selected_option = int(selected_option)
+    elif data.startswith('examstart'):
+        _,exam_id = data.split('_')
+        now = time.time()
         exam_id = int(exam_id)
-        next_var = int(next_var)
-        user_id = find_user_id(cid)['ID']
+        exam_cid_time.setdefault(exam_id , {})
+        exam_cid_time[exam_id].setdefault(cid , now)
+        markup = create_inline_for_exam(exam_id , 0 , cid)
+        send_question_exam(cid , 0 , exam_id , markup)
+        bot.edit_message_reply_markup(cid , mid , reply_markup=None)
+        bot.answer_callback_query(call_id , 'exam started')
 
-        if is_answered_in_exam(user_id , exam_id ,qid):
-            if selected_option != what_option_answered_in_exam(user_id , qid , exam_id):
-                update_option_in_exam(user_id , qid , selected_option , exam_id)
+    elif data.startswith('examop'):
+        _,selected_option,qindex,exam_id,next_var = data.split('_')
+        cid_status = check_cid_in_exam(cid , int(exam_id))
+        if cid_status == True:        
+            qindex = int(qindex)
+            info_data = create_list_question_exam(cid , exam_id)
+            qid = info_data[qindex]
+            selected_option = int(selected_option)
+            exam_id = int(exam_id)
+            next_var = int(next_var)
+            user_id = find_user_id(cid)['ID']
+
+            if is_answered_in_exam(user_id , exam_id ,qid):
+                if selected_option != what_option_answered_in_exam(user_id , qid , exam_id):
+                    update_option_in_exam(user_id , qid , selected_option , exam_id)
+            else :
+                add_answer_for_question(user_id , qid , selected_option , exam_id)  
+            if next_var == 1:
+                new_markup = create_inline_for_answered_in_exam(selected_option , exam_id , qindex , cid)
+            else :
+                new_markup = create_inline_for_answered_in_exam(selected_option , exam_id , qindex , cid , next=False)
+            try :
+                bot.edit_message_reply_markup(cid , mid , reply_markup = new_markup)
+            except :
+                pass
+            bot.answer_callback_query(call_id , 'question answered')
         else :
-            add_answer_for_question(user_id , qid , selected_option , exam_id)  
-
-        if next_var == 1:
-            new_markup = create_inline_for_answered_in_exam(selected_option , exam_id , qindex , cid)
-        else :
-            new_markup = create_inline_for_answered_in_exam(selected_option , exam_id , qindex , cid , next=False)
-
-        try :
-            bot.edit_message_reply_markup(cid , mid , reply_markup = new_markup)
-        except :
-            pass
-        bot.answer_callback_query(call_id , 'question answered')
-        
+            msgid = bot.send_message(cid , text['examtimeover'])
+            msgid = msgid.message_id
+            time_to_delete = time.time() + 3
+            delete_messages_dict.setdefault((msgid , cid) , time_to_delete)
+            bot.answer_callback_query(call_id , 'None')
 
     elif data.startswith('examquestionselect'):
         # working here ... 
         _,new_index,exam_id = data.split('_')
-        new_index = int(new_index)
-        exam_id = int(exam_id)
-        data = create_list_question_exam(cid , exam_id)
-        question_id = data[new_index]
-        user_id = find_user_id(cid)['ID']
-        new_markup = create_inline_for_exam(exam_id , new_index , cid)
-        if is_answered_in_exam(user_id , exam_id , question_id):
-            option = what_option_answered_in_exam(find_user_id(cid)['ID'] , question_id , exam_id)
-            old_markup = create_inline_for_answered_in_exam(option , exam_id , new_index , cid , next = False)
+        cid_status = check_cid_in_exam(cid , int(exam_id))
+        if cid_status == True:   
+            new_index = int(new_index)
+            exam_id = int(exam_id)
+            info_data = create_list_question_exam(cid , exam_id)
+            question_id = info_data[new_index]
+            user_id = find_user_id(cid)['ID']
+            new_markup = create_inline_for_exam(exam_id , new_index , cid)
+            if is_answered_in_exam(user_id , exam_id , question_id):
+                option = what_option_answered_in_exam(find_user_id(cid)['ID'] , question_id , exam_id)
+                old_markup = create_inline_for_answered_in_exam(option , exam_id , new_index , cid , next = False)
+            else :
+                old_markup = create_inline_for_exam(exam_id , new_index , cid , next=False)
+
+            bot.edit_message_reply_markup(cid , mid , reply_markup=old_markup)
+            send_question_exam(cid , new_index , exam_id , new_markup)
+            bot.answer_callback_query(call_id , 'question changed')
         else :
-            old_markup = create_inline_for_exam(exam_id , new_index , cid , next=False)
+            msgid = bot.send_message(cid , text['examtimeover'])
+            msgid = msgid.message_id
+            time_to_delete = time.time() + 3
+            delete_messages_dict.setdefault((msgid , cid) , time_to_delete)
+            bot.answer_callback_query(call_id , 'None')
 
-        bot.edit_message_reply_markup(cid , mid , reply_markup=old_markup)
-        send_question_exam(cid , new_index , exam_id , new_markup)
-        bot.answer_callback_query(call_id , 'question changed')
-
+    # 'endtimeexam_{exam_id}'
+    elif data.startswith('endtimeexam'):
+        _,exam_id = data.split('_')
+        exam_id = int(exam_id)
+        status = check_cid_in_exam(cid , exam_id)
+        if status == True:
+            exam_cid_time[exam_id][cid] = None
+            bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['examended'])
+            bot.answer_callback_query(call_id , 'finish')
+        else :
+            msgid = bot.send_message(cid , text['examtimeover'])
+            msgid = msgid.message_id
+            time_to_delete = time.time() + 3
+            delete_messages_dict.setdefault((msgid , cid) , time_to_delete)
+            bot.answer_callback_query(call_id , 'None')
 
     # ------------------------------------------
         
@@ -1111,7 +1237,8 @@ def exit_report_panel_handler(message):
 
 # ------------------ enter exam
 
-# exam_cid_time = {} # exam_id : [{cid : start_time} , ...]
+# markup = create_inline_for_exam(1 , 0 , cid)
+# send_question_exam(cid , 0 , 1 , markup)
 
 @bot.message_handler(func = lambda m : m.text == Button['exam'])
 def enter_exam_handler(message):
@@ -1119,8 +1246,31 @@ def enter_exam_handler(message):
     if is_spam(cid) : 
             return 
     manage_user(message , cid)
-    markup = create_inline_for_exam(1 , 0 , cid)
-    send_question_exam(cid , 0 , 1 , markup)
+    user_step.setdefault(cid , '')
+    user_step[cid] = 'enterexamcode'
+    bot.send_message(cid , text['enterexam'])
+
+@bot.message_handler(func = lambda m : user_step.get(m.chat.id , '_') == 'enterexamcode')
+def enter_exam_handler(message):
+    cid = message.chat.id
+    if is_spam(cid) : 
+            return 
+    manage_user(message , cid)
+    code = message.text.strip()
+    exam_info = get_info_from_special_code(special_code=code)
+    if exam_info is None :
+        bot.send_message(cid , text['examnotfound'])
+        user_step.pop(cid)
+    else :
+        active = exam_info['is_active']
+        if active == 0:
+            bot.send_message(cid , text['examisnotactive'])
+        else :
+            exam_id = exam_info['id']
+            markup = InlineKeyboardMarkup()
+            markup.add(InlineKeyboardButton(Button['examstart'] , callback_data=f'examstart_{exam_id}'))
+            bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['guideforenterexam'] , reply_markup=markup)
+    user_step.pop(cid)
 
 # ------------------
 
@@ -1958,4 +2108,6 @@ get_teachers()
 print('bot is running !' , os.getcwd() , sep = ' ---> ')
 
 #skip_pending=True
+
+thread.start()
 bot.infinity_polling()

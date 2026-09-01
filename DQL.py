@@ -140,7 +140,8 @@ def get_report_quiz_from_telegram_id(cid):
     connection.close()
     return result
 
-# exam section
+# exam section ---------------------- 
+
 
 def what_option_answered_in_exam(user_id , question_id , exam_id):
     connection = mysql.connector.connect(**config , database = database_name)
@@ -226,8 +227,24 @@ def get_question_count_for_exam(exam_id):
     connection.close()
     return len(result)
 
+def get_info_from_special_code(special_code):
+    '''
+        special code -------> exam information : id , name , designer_id , is_active , time
+        output ---> one dictionary
+    '''
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor(dictionary=True)
+    SQL_QUERY = '''
+        SELECT id , name , designer_id , is_active , time FROM exam WHERE special_code = (%s)
+    '''
+    cur.execute(SQL_QUERY , (special_code , ))
+    result = cur.fetchone()
+    cur.close()
+    connection.close()
+    return result
+
 if __name__ == '__main__':
-    print(what_option_answered_in_exam(7 , 6 , 1))
+    print(get_info_from_special_code('R9XB3WB'))
     # print(get_report_quiz_from_telegram_id(1454840970)[2])
     # print(find_user_id(1454840970)['ID'])
     # print(find_designer_telegram_id(2))
