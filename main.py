@@ -1,6 +1,5 @@
 import telebot
 from telebot.types import ReplyKeyboardMarkup , ReplyKeyboardRemove,InlineKeyboardMarkup,InlineKeyboardButton
-from requests_forwarder import setup_proxy
 from config_bot import *
 from config_db import *
 import os
@@ -13,17 +12,20 @@ from read_excel_file import *
 import secrets
 import threading
 import logging
+import openpyxl
 
 logging.basicConfig(filename = 'project.log' , level = logging.ERROR , format = '%(asctime)s-%(levelname)s : %(message)s')
 
 # logging.debug(f'{dirname} moved to {result_dir / 'media'}')
 
-setup_proxy(proxy_token=proxy_token)
+# from requests_forwarder import setup_proxy
+# setup_proxy(proxy_token=proxy_token)
 
 bot = telebot.TeleBot(telegram_token , threaded= 5)
 hide_board = ReplyKeyboardRemove()
 
 os.makedirs(os.path.join('excel_files' , 'data') , exist_ok=True)
+
 
 CHANNEL_ID = -1004392460681 #messages
 
@@ -219,6 +221,26 @@ def create_start_keyboard(cid) :
         keyboard.add(Button['teacherpanel'])
         
     return keyboard
+# ---------------
+
+def generate_sample_excel(file_path=os.path.join('excel_files' , 'sample.xlsx')):
+    if os.path.exists(file_path):
+        return file_path
+    
+    wb = openpyxl.Workbook()
+    ws = wb.active
+
+    headers = ["category_id", "text", "photo_id", "answer_text", "op1", "op2", "op3", "op4", "ans_option"]
+    ws.append(headers)
+
+    row_2 = ["", "", "NULL", '"isphoto" + photo_id if you have a picture', "", "", "", "", ""]
+    ws.append(row_2)
+
+    wb.save(file_path)
+    return file_path
+
+generate_sample_excel()
+
 # ---------------
 def create_teacher_panel(cid) :
     user_panel[cid] = TEACHER_PANEL
@@ -782,6 +804,9 @@ def check_delete_messages_list():
 def worker(deltatime):
     while True:
         try :
+            if len(teachers) == 0 and len(admins) == 0:
+                get_admins()
+                get_teachers()
             check_delete_messages_list()
             check_exam_time()
             # print(delete_messages_dict)
@@ -792,7 +817,7 @@ def worker(deltatime):
     
 thread = threading.Thread(
     target=worker, 
-    args=(2,), 
+    args=(5,), 
     daemon=True
 )
 
@@ -2250,8 +2275,8 @@ def every_messages_handler(message):
     markup = create_start_keyboard(cid)
     bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['help'] , reply_markup=markup)
 
-get_admins()
-get_teachers()
+# get_admins()
+# get_teachers()
 
 print('bot is running !' , os.getcwd() , sep = ' ---> ')
 
