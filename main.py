@@ -14,7 +14,8 @@ import threading
 import logging
 import openpyxl
 
-logging.basicConfig(filename = 'project.log' , level = logging.ERROR , format = '%(asctime)s-%(levelname)s : %(message)s')
+os.makedirs('Data' , exist_ok=True)
+logging.basicConfig(filename = os.path.join('Data','project.log') , level = logging.ERROR , format = '%(asctime)s-%(levelname)s : %(message)s')
 
 # logging.debug(f'{dirname} moved to {result_dir / 'media'}')
 

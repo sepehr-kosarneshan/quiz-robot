@@ -3,5 +3,6 @@
 *.env
 *.xlsx
 *.csv
+*.zip
 __pycache__
 venv

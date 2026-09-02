@@ -95,7 +95,7 @@ def add_teacher_with_tel_id(telegram_id) :
     connection = mysql.connector.connect(**config , database = database_name)
     cur = connection.cursor()
     SQL_QUERY = '''
-        UPDATE USERS SET `is_teacher` = 1 WHERE `telegram_id` = (%s)
+        UPDATE users SET `is_teacher` = 1 WHERE `telegram_id` = (%s)
     '''
     cur.execute(SQL_QUERY , (telegram_id,))
     connection.commit()

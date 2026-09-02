@@ -7,7 +7,7 @@ def find_user_id(telegram_id):
     '''
     connection = mysql.connector.connect(**config , database = database_name)
     cur = connection.cursor(dictionary=True)
-    SQL_QUERY = 'SELECT `ID` FROM USERS WHERE `telegram_id` = %s'
+    SQL_QUERY = 'SELECT `ID` FROM users WHERE `telegram_id` = %s'
     cur.execute(SQL_QUERY , (telegram_id,))
     result = cur.fetchone()
     cur.close()
@@ -17,7 +17,7 @@ def find_user_id(telegram_id):
 def get_user_information(telegram_id):
     connection = mysql.connector.connect(**config , database = database_name)
     cur = connection.cursor(dictionary=True)
-    SQL_QUERY = 'SELECT * FROM USERS WHERE `telegram_id` = %s'
+    SQL_QUERY = 'SELECT * FROM users WHERE `telegram_id` = %s'
     cur.execute(SQL_QUERY , (telegram_id,))
     result = cur.fetchone()
     cur.close()
@@ -42,7 +42,7 @@ def get_is_teacher_status(telegram_id) :
     connection = mysql.connector.connect(**config , database = database_name)
     cur = connection.cursor(dictionary=True)
     SQL_QUERY = '''
-        SELECT `is_teacher` FROM USERS WHERE `telegram_id` = (%s)
+        SELECT `is_teacher` FROM users WHERE `telegram_id` = (%s)
     '''
     cur.execute(SQL_QUERY , (telegram_id,))
     result = cur.fetchone()
