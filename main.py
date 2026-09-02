@@ -22,8 +22,6 @@ hide_board = ReplyKeyboardRemove()
 
 os.makedirs(os.path.join('excel_files' , 'data') , exist_ok=True)
 
-#print(f'{os.getcwd()}')
-
 CHANNEL_ID = -1004392460681 #messages
 
 command = {
@@ -133,7 +131,7 @@ def set_name(first_name , last_name) :
 def manage_user(message , cid):  # working here ...
     global admins
     global teachers
-    print('teachers : ' , teachers , sep = ' : ')
+    # print('teachers : ' , teachers , sep = ' : ')
     data = get_users()
     first_name = message.from_user.first_name
     last_name = message.from_user.last_name
@@ -151,7 +149,7 @@ def manage_user(message , cid):  # working here ...
             if (user['is_teacher'] == 1) and (cid not in teachers):
                 teachers.append(cid)
             elif user['is_teacher'] == 0:
-                print('hello is teacher = 0')
+                # print('hello is teacher = 0')
                 if user['telegram_id'] in teachers :
                     teachers.remove(user['telegram_id'])
             break
@@ -181,7 +179,7 @@ def is_spam(cid):
 def reply_message_type(message):
     try :
         reply_id = message.reply_to_message.forward_origin.type
-        print(reply_id)
+        # print(reply_id)
     except :
         reply_id = False
     return reply_id
@@ -280,7 +278,7 @@ def create_report_quiz(cid): # working here ...
         else :
             report_dict[category_name]['false'] += 1
     result_text = text['reporttextquiz'] + '\n\n'
-    print(report_dict)
+    # print(report_dict)
     for key in report_dict.keys():
         value = report_dict[key]
         percent = (100 * value['true'])/(value['true'] + value['false'])
@@ -474,6 +472,7 @@ def create_inline_for_answered_in_exam(user_choice , exam_id , question_index , 
     Buttons = []
     for i in range(len(options)):
         data = f'examop_{options[i][0]}_{question_index}_{exam_id}_{next_var}'
+        # print(data)
         text_option = option_sticker[str(options[i][0])]
         if 'u' in options[i]:
             Buttons.append(InlineKeyboardButton(text_option , callback_data = data , style='primary'))
@@ -697,7 +696,6 @@ def check_cid_in_exam(cid , exam_id):
 def check_delete_messages_list():
     # (mid , cid) : time to delete , ...}
     global delete_messages_dict
-    print(delete_messages_dict)
     pop_list = [] # mid
     for cmid in delete_messages_dict:
         mid,cid = cmid
@@ -714,13 +712,14 @@ def check_delete_messages_list():
 
 def worker(deltatime):
     while True:
-        # try :
-        check_delete_messages_list()
-        check_exam_time()
-        print(exam_cid_time)
-        time.sleep(deltatime)
-        # except :
-        #     pass
+        try :
+            check_delete_messages_list()
+            check_exam_time()
+            # print(delete_messages_dict)
+            # print(exam_cid_time)
+            time.sleep(deltatime)
+        except :
+            pass
     
 thread = threading.Thread(
     target=worker, 
@@ -771,17 +770,17 @@ def callback_handler(call):
         bot.send_message(cid , text['add_question_admin_resp'])
         bot.send_message(cid , text['photo_and_text_question'])
         if str(user_panel[cid]).startswith('ADDAQUESTIONEXAM') :
-            print('Add Question Panel')
+            # print('Add Question Panel')
             status = user_panel[cid]
             _,exam_id = status.split('_')
             user_step.setdefault(cid , '')
             user_step[cid] = f'addquestion_{category_id}_{exam_id}'
             user_panel[cid] = ADDAQUESTIONEXAM
-            print(user_step)
+            # print(user_step)
         else :
-            print('General Quiz Panel')
+            # print('General Quiz Panel')
             user_step.setdefault(cid , f'addquestion_{category_id}')
-            print(user_step)
+            # print(user_step)
 
     # categories
     elif data.startswith('changepageshowcat'):
@@ -1053,7 +1052,7 @@ def callback_handler(call):
         _,exam_id = data.split('_')
         user_step.setdefault(cid , '')
         user_step[cid] = f'examtimechange_{exam_id}_{mid}'
-        print(user_step)
+        # print(user_step)
         bot.send_message(cid , text['examtimechanging'])
         bot.answer_callback_query(call_id , 'time change')
 
@@ -1090,7 +1089,7 @@ def callback_handler(call):
         bot.answer_callback_query(call_id , 'show data')
 
     # ------------- enter exam callback handlers
-    
+
     elif data.startswith('examstart'):
         _,exam_id = data.split('_')
         now = time.time()
@@ -1102,23 +1101,32 @@ def callback_handler(call):
         bot.edit_message_reply_markup(cid , mid , reply_markup=None)
         bot.answer_callback_query(call_id , 'exam started')
 
+    # examop_4_{question_index}_{exam_id}_{next_var}')
+
     elif data.startswith('examop'):
+        print(data)
         _,selected_option,qindex,exam_id,next_var = data.split('_')
         cid_status = check_cid_in_exam(cid , int(exam_id))
+        # print('cid status : ' , cid_status , sep = ' : ')
         if cid_status == True:        
             qindex = int(qindex)
             info_data = create_list_question_exam(cid , exam_id)
+            # print('info_data' , info_data , sep = ' : ')
             qid = info_data[qindex]
             selected_option = int(selected_option)
             exam_id = int(exam_id)
             next_var = int(next_var)
             user_id = find_user_id(cid)['ID']
-
+            # ---------------
             if is_answered_in_exam(user_id , exam_id ,qid):
+                # print('in soal ghablan pasokh dade shode')
                 if selected_option != what_option_answered_in_exam(user_id , qid , exam_id):
                     update_option_in_exam(user_id , qid , selected_option , exam_id)
+                    # print('gozineh jadid fargh dare b ghabli')
             else :
                 add_answer_for_question(user_id , qid , selected_option , exam_id)  
+                # print('javab be database ezafe shod')
+            # ---------------
             if next_var == 1:
                 new_markup = create_inline_for_answered_in_exam(selected_option , exam_id , qindex , cid)
             else :
@@ -1128,6 +1136,7 @@ def callback_handler(call):
             except :
                 pass
             bot.answer_callback_query(call_id , 'question answered')
+
         else :
             msgid = bot.send_message(cid , text['examtimeover'])
             msgid = msgid.message_id
@@ -1139,16 +1148,18 @@ def callback_handler(call):
         # working here ... 
         _,new_index,exam_id = data.split('_')
         cid_status = check_cid_in_exam(cid , int(exam_id))
+        # print('cid status in next question select : ' , cid_status , sep = ' : ')
         if cid_status == True:   
             new_index = int(new_index)
             exam_id = int(exam_id)
             info_data = create_list_question_exam(cid , exam_id)
-            question_id = info_data[new_index]
+            question_id = info_data[new_index-1]
             user_id = find_user_id(cid)['ID']
             new_markup = create_inline_for_exam(exam_id , new_index , cid)
             if is_answered_in_exam(user_id , exam_id , question_id):
+                # print('in soal ghablan pasokh dade shode')
                 option = what_option_answered_in_exam(find_user_id(cid)['ID'] , question_id , exam_id)
-                old_markup = create_inline_for_answered_in_exam(option , exam_id , new_index , cid , next = False)
+                old_markup = create_inline_for_answered_in_exam(option , exam_id , new_index-1 , cid , next = False)
             else :
                 old_markup = create_inline_for_exam(exam_id , new_index , cid , next=False)
 
@@ -1198,7 +1209,7 @@ def start_command_handler(message):
     if is_spam(cid) : 
         return 
     manage_user(message , cid)
-    print(admins)
+    # print(admins)
     markup = create_start_keyboard(cid)
     bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['start'] , reply_markup = markup)
     #bot.send_message(cid , show_commands(cid) , parse_mode='MarkdownV2')
@@ -1759,7 +1770,7 @@ def get_question_handler(message):
         admin_question.setdefault(cid , dict())
         admin_question[cid].setdefault('file_id' , file_id)
         admin_question[cid].setdefault('text' , message.caption)
-        print(admin_question)
+        # print(admin_question)
 
         if user_panel.get(cid , '_') == ADDAQUESTIONEXAM:
             user_step[cid] = f'getoption1_{category_id}_{exam_id}'
@@ -1770,7 +1781,7 @@ def get_question_handler(message):
         admin_question.setdefault(cid , dict())
         admin_question[cid].setdefault('text' , message.text)
         admin_question[cid].setdefault('file_id' , None)
-        print(admin_question)
+        # print(admin_question)
 
         if user_panel.get(cid , '_') == ADDAQUESTIONEXAM:
             user_step[cid] = f'getoption1_{category_id}_{exam_id}'
@@ -1791,7 +1802,7 @@ def get_option1_handler(message):
         _,category_id = (user_step[cid]).split('_')
     category_id = int(category_id)
     admin_question[cid].setdefault('option1' , message.text)
-    print(admin_question)
+    # print(admin_question)
 
     if user_panel.get(cid , '_') == ADDAQUESTIONEXAM:
         user_step[cid] = f'getoption2_{category_id}_{exam_id}'
@@ -1812,7 +1823,7 @@ def get_option2_handler(message):
         _,category_id = (user_step[cid]).split('_')
     category_id = int(category_id)
     admin_question[cid].setdefault('option2' , message.text)
-    print(admin_question)
+    # print(admin_question)
 
     if user_panel.get(cid , '_') == ADDAQUESTIONEXAM:
         user_step[cid] = f'getoption3_{category_id}_{exam_id}'
@@ -1833,7 +1844,7 @@ def get_option1_handler(message):
         _,category_id = (user_step[cid]).split('_')
     category_id = int(category_id)
     admin_question[cid].setdefault('option3' , message.text)
-    print(admin_question)
+    # print(admin_question)
 
     if user_panel.get(cid , '_') == ADDAQUESTIONEXAM:
         user_step[cid] = f'getoption4_{category_id}_{exam_id}'
@@ -1854,7 +1865,7 @@ def get_option1_handler(message):
         _,category_id = (user_step[cid]).split('_')
     category_id = int(category_id)
     admin_question[cid].setdefault('option4' , message.text)
-    print(admin_question)
+    # print(admin_question)
 
     if user_panel.get(cid , '_') == ADDAQUESTIONEXAM:
         user_step[cid] = f'optionans_{category_id}_{exam_id}'
@@ -1875,7 +1886,7 @@ def get_option1_handler(message):
         _,category_id = (user_step[cid]).split('_')
     category_id = int(category_id)
     admin_question[cid].setdefault('option_answer' , int(message.text))
-    print(admin_question)
+    # print(admin_question)
 
     if user_panel.get(cid , '_') == ADDAQUESTIONEXAM:
         user_step[cid] = f'textans_{category_id}_{exam_id}'
@@ -1887,7 +1898,7 @@ def get_option1_handler(message):
 @bot.message_handler(content_types = ['text' , 'photo'],
                      func = lambda m : (user_step.get(m.chat.id , '_')).startswith('textans'))
 def get_option1_handler(message):
-    print('hello')
+    # print('hello')
     cid = message.chat.id
     if is_spam(cid) : 
         return
@@ -1907,7 +1918,7 @@ def get_option1_handler(message):
         photo = file_list[-1]
         file_id = photo.file_id
         admin_question[cid].setdefault('text_answer' , 'isphoto' + file_id)
-    print(admin_question)
+    # print(admin_question)
     user_id_in_table = find_user_id(cid)
 
     if user_panel.get(cid , '_') == ADDAQUESTIONEXAM:
@@ -2079,7 +2090,7 @@ def support_request_handler(message):
         bot.send_message(admins[i] , text['support_request'] , reply_markup=markup)
     # user
     bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['sended_support']) #to user who wanted support
-    print(message.text)
+    # print(message.text)
     add_support_request(user_id = find_user_id(cid)['ID'] , message_id = mid , text = message.text)
     user_step.pop(cid)
 

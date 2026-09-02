@@ -244,6 +244,7 @@ def get_info_from_special_code(special_code):
     return result
 
 if __name__ == '__main__':
+    print(is_answered_in_exam(1 , 1 , 1))
     print(get_info_from_special_code('R9XB3WB'))
     # print(get_report_quiz_from_telegram_id(1454840970)[2])
     # print(find_user_id(1454840970)['ID'])
