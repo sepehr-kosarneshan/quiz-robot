@@ -12,10 +12,13 @@ from DML import *
 from read_excel_file import *
 import secrets
 import threading
+import logging
 
-setup_proxy(
-    proxy_token=proxy_token
-)
+logging.basicConfig(filename = 'project.log' , level = logging.ERROR , format = '%(asctime)s-%(levelname)s : %(message)s')
+
+# logging.debug(f'{dirname} moved to {result_dir / 'media'}')
+
+setup_proxy(proxy_token=proxy_token)
 
 bot = telebot.TeleBot(telegram_token , threaded= 5)
 hide_board = ReplyKeyboardRemove()
@@ -55,6 +58,7 @@ CHANNEL_MESSAGES = {
     'guideformanageexam': 22,
     'guideforenterexam' : 24,
     'examended'         : 26,
+    'showreportforexam' : 28,
 }
 
 EDIT_QUESTION_PAGES = [
@@ -277,6 +281,7 @@ def create_report_quiz(cid): # working here ...
             report_dict[category_name]['true'] += 1
         else :
             report_dict[category_name]['false'] += 1
+    
     result_text = text['reporttextquiz'] + '\n\n'
     # print(report_dict)
     for key in report_dict.keys():
@@ -293,8 +298,35 @@ def create_report_quiz(cid): # working here ...
     return result_text.strip(clean_text_for_markdown('---------------------------------'))
                 
 
-def create_report_exam(cid , exam_id): #working here 
-    pass
+def create_report_exam(cid , exam_id): 
+    db_data = get_report_exam_from_telegram_id(cid , exam_id)
+    total_questions = len(get_list_of_question_in_exam(exam_id))
+    name = get_exam_data_id(exam_id)['name']
+    report_dict = {} # 'category_name' : {true : ... , false : ...}
+    for item in db_data:
+        category_name = item['category_name']
+        report_dict.setdefault(category_name , {'true' : 0 , 'false' : 0})
+        if item['answer_option'] == item['selected_option']:
+            report_dict[category_name]['true'] += 1
+        else :
+            report_dict[category_name]['false'] += 1
+    result_text = text['reportexamuser'] + '\n'
+    result_text += name + '\n\n'
+    # print(report_dict)
+    for key in report_dict.keys():
+        value = report_dict[key]
+        percent = (100 * value['true'])/(total_questions)
+        result_text += f'__{key}__\n'
+        result_text += text['correct'] + '\n'
+        result_text += str(value['true']) + '\n'
+        result_text += text['false'] + '\n'
+        result_text += str(value['false']) + '\n'
+        result_text += text['empty'] + '\n'
+        result_text += str(total_questions - value['true'] - value['false']) + '\n'
+        result_text += text['percent'] + '\n'
+        result_text += f'*{clean_text_for_markdown(str(round(percent , 3)))}%*\n\n'
+        result_text += clean_text_for_markdown('---------------------------------\n')
+    return result_text.strip(clean_text_for_markdown('---------------------------------'))
 
 # ---------------------
 
@@ -452,12 +484,16 @@ def create_inline_for_exam(exam_id , question_index , cid , next = True):
         right_button = InlineKeyboardButton(text['nextquestionexam'] , callback_data=f'examquestionselect_{question_index + 1}_{exam_id}')
         if question_index != len(data) - 1:
             markup.add(right_button)
-
+    markup.add(InlineKeyboardButton(text['get_answer_for_question'] , callback_data=f'examgetanswer_{data[question_index]}_{exam_id}' , style='primary'))
     markup.add(InlineKeyboardButton(text['endexamtime'] , callback_data = f'endtimeexam_{exam_id}'))
+
+    print(f'this inline created for question with id = {data[question_index]}')
+
     return markup
 
 def create_inline_for_answered_in_exam(user_choice , exam_id , question_index , cid , next = True):
     data = create_list_question_exam(cid , exam_id)
+    qid = data[question_index]
     next_var = 1
     if next == False:
         next_var = 0
@@ -471,13 +507,13 @@ def create_inline_for_answered_in_exam(user_choice , exam_id , question_index , 
             options[i] += 'u'
     Buttons = []
     for i in range(len(options)):
-        data = f'examop_{options[i][0]}_{question_index}_{exam_id}_{next_var}'
+        calldata = f'examop_{options[i][0]}_{question_index}_{exam_id}_{next_var}'
         # print(data)
         text_option = option_sticker[str(options[i][0])]
         if 'u' in options[i]:
-            Buttons.append(InlineKeyboardButton(text_option , callback_data = data , style='primary'))
+            Buttons.append(InlineKeyboardButton(text_option , callback_data = calldata , style='primary'))
         else :
-            Buttons.append(InlineKeyboardButton(text_option , callback_data = data))
+            Buttons.append(InlineKeyboardButton(text_option , callback_data = calldata))
     markup.add(Buttons[0] , Buttons[1])
     markup.add(Buttons[2] , Buttons[3])
 
@@ -485,8 +521,10 @@ def create_inline_for_answered_in_exam(user_choice , exam_id , question_index , 
         right_button = InlineKeyboardButton(text['nextquestionexam'] , callback_data=f'examquestionselect_{question_index + 1}_{exam_id}')
         if question_index != len(data) - 1:
             markup.add(right_button)
-
+    markup.add(InlineKeyboardButton(text['get_answer_for_question'] , callback_data=f'examgetanswer_{qid}_{exam_id}' , style='primary'))
     markup.add(InlineKeyboardButton(text['endexamtime'] , callback_data = f'endtimeexam_{exam_id}'))
+
+    print(f'this answered inline created for question with id = {data[question_index]} with user choice {user_choice}')
 
     return markup
 
@@ -588,12 +626,20 @@ def clean_text_for_markdown(text_):
             result += char
     return result
 
+def create_text_for_starting_exam(exam_id):
+    info = get_exam_data_id(exam_id)
+    total_question = get_question_count_for_exam(exam_id)
+    result = f' نام آزمون : {info['name']}\n\nتعداد سوال : {total_question}\n\nمدت زمان پاسخ دهی : {info['time']} دقیقه'
+    return result
+
 def create_text_for_exam_code(code , exam_name):
     clean_code = clean_text_for_markdown(code)
     clean_exam_name = clean_text_for_markdown(exam_name)
+    clean_guide_text = clean_text_for_markdown(text['examcodecopy'])
     result = text['createtextforcode']
     result += f'\n__{clean_exam_name}__'
-    result += f'\n\n||{clean_code}||'
+    result += f'\n\n`{clean_code}`\n\n'
+    result += f'_{clean_guide_text}_'
     return result
 
 def create_inline_manage_exam(id):
@@ -652,7 +698,30 @@ def create_inline_for_show_exams(data , page = 0):
         return markup
     else :
         return False
-    
+
+def create_inline_for_show_exams_for_report(data , page = 0): 
+    '''
+        data = get_exam_participation_cid(cid)
+    '''
+    exam_pages = create_page_list_for_exams(data)
+    if 0<= page <= len(exam_pages) - 1 :
+        exam = exam_pages[page]
+        markup = InlineKeyboardMarkup()
+        for i in range(len(exam)):
+            markup.add(InlineKeyboardButton(f'{exam[i]['name']}' , callback_data= f'examshowreport_{exam[i]['exam_id']}'))
+        left_button = InlineKeyboardButton('◀️' , callback_data=f'examshowreportchpage_{page - 1}')
+        right_button = InlineKeyboardButton('▶️' , callback_data=f'examshowreportchpage_{page + 1}')
+        if len(exam_pages) != 1:
+            if page == len(exam_pages) - 1:
+                markup.add(left_button)
+            elif page == 0 : 
+                markup.add(right_button)
+            else :
+                markup.add(left_button , right_button)
+        return markup
+    else :
+        return False
+
 # --------------------- worker
 
 # exam_cid_time = {} # {... , exam_id : {cid : start_time , ... } , ...}
@@ -999,6 +1068,21 @@ def callback_handler(call):
         bot.answer_callback_query(call_id , 'page changed')
 
     # -------------------- exam management
+    elif data.startswith('examshowreportchpage'):
+        _,new_page = data.split('_')
+        new_page = int(new_page)
+        data = get_exam_participation_cid(cid)
+        new_markup = create_inline_for_show_exams_for_report(data , new_page)
+        bot.edit_message_reply_markup(cid , mid , reply_markup=new_markup)
+    
+    elif data.startswith('examshowreport'):
+        _,exam_id = data.split('_')
+        exam_id = int(exam_id)
+        report = create_report_exam(cid , exam_id)
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton(text['deletemessage'] , callback_data='deletemessage'))
+        bot.send_message(cid , report , reply_markup = markup , parse_mode='MarkdownV2')
+        bot.answer_callback_query(call_id , 'report created')
 
     elif data.startswith('getspecialcode'):
         _,exam_id = data.split('_')
@@ -1097,14 +1181,46 @@ def callback_handler(call):
         exam_cid_time.setdefault(exam_id , {})
         exam_cid_time[exam_id].setdefault(cid , now)
         markup = create_inline_for_exam(exam_id , 0 , cid)
+        starttext = create_text_for_starting_exam(exam_id)
+        bot.send_message(cid , starttext)
         send_question_exam(cid , 0 , exam_id , markup)
         bot.edit_message_reply_markup(cid , mid , reply_markup=None)
         bot.answer_callback_query(call_id , 'exam started')
 
-    # examop_4_{question_index}_{exam_id}_{next_var}')
+    elif data.startswith('examgetanswer'):
+        _,question_id,exam_id = data.split('_')
+        # print(data)
+        question_id = int(question_id)
+        exam_id = int(exam_id)
+        cid_status = check_cid_in_exam(cid , exam_id)
+        if cid_status == False:
+            info = get_question_information(question_id)
+            answer_photo = None
+            answer_text = None
+            if info['answer_text'].startswith('isphoto'):
+                photo_id = info['answer_text'][7:]
+                answer_photo =  photo_id
+            else :
+                answer_text = info['answer_text'] 
+            markup = InlineKeyboardMarkup()
+            markup.add(InlineKeyboardButton(text['delete_answer_text_photo'], callback_data='deleteans'))
+            # # if find_designer_telegram_id(qid) != cid:
+            markup.add(InlineKeyboardButton(text['report_question_designer'], callback_data=f'reportques_{question_id}'))
+            if answer_text is not None:
+                bot.send_message(cid , answer_text , reply_to_message_id=mid , reply_markup=markup)
+            else :
+                bot.send_photo(cid , answer_photo , reply_to_message_id=mid , reply_markup=markup)
+            bot.answer_callback_query(call_id , 'answer')
+        else :
+            msgid = bot.send_message(cid , text['youcannotseeanswer'])
+            msgid = msgid.message_id
+            time_to_delete = time.time() + 4
+            delete_messages_dict.setdefault((msgid , cid) , time_to_delete)
+            bot.answer_callback_query(call_id , 'None')
 
+    # examop_4_{question_index}_{exam_id}_{next_var}')
     elif data.startswith('examop'):
-        print(data)
+        # print(data)
         _,selected_option,qindex,exam_id,next_var = data.split('_')
         cid_status = check_cid_in_exam(cid , int(exam_id))
         # print('cid status : ' , cid_status , sep = ' : ')
@@ -1144,7 +1260,7 @@ def callback_handler(call):
             delete_messages_dict.setdefault((msgid , cid) , time_to_delete)
             bot.answer_callback_query(call_id , 'None')
 
-    elif data.startswith('examquestionselect'):
+    elif data.startswith('examquestionselect'): # there is a bug
         # working here ... 
         _,new_index,exam_id = data.split('_')
         cid_status = check_cid_in_exam(cid , int(exam_id))
@@ -1155,13 +1271,15 @@ def callback_handler(call):
             info_data = create_list_question_exam(cid , exam_id)
             question_id = info_data[new_index-1]
             user_id = find_user_id(cid)['ID']
+            # print('new index : ' , new_index)
+            # print('pre question id' , question_id)
             new_markup = create_inline_for_exam(exam_id , new_index , cid)
             if is_answered_in_exam(user_id , exam_id , question_id):
                 # print('in soal ghablan pasokh dade shode')
                 option = what_option_answered_in_exam(find_user_id(cid)['ID'] , question_id , exam_id)
                 old_markup = create_inline_for_answered_in_exam(option , exam_id , new_index-1 , cid , next = False)
             else :
-                old_markup = create_inline_for_exam(exam_id , new_index , cid , next=False)
+                old_markup = create_inline_for_exam(exam_id , new_index-1 , cid , next=False)
 
             bot.edit_message_reply_markup(cid , mid , reply_markup=old_markup)
             send_question_exam(cid , new_index , exam_id , new_markup)
@@ -1228,7 +1346,7 @@ def start_command_handler(message):
 def show_performance_handler(message):
     cid = message.chat.id
     if is_spam(cid) : 
-            return 
+        return 
     manage_user(message , cid)
     markup = create_report_panel(cid)
     bot.send_message(cid , text['enterreportpanel'] , reply_markup=markup)
@@ -1237,7 +1355,7 @@ def show_performance_handler(message):
 def exit_report_panel_handler(message):
     cid = message.chat.id
     if is_spam(cid) : 
-            return 
+        return 
     manage_user(message , cid)
     markup = create_start_keyboard(cid)
     bot.send_message(cid , text['exitreportpanel'] , reply_markup=markup)
@@ -1255,7 +1373,7 @@ def exit_report_panel_handler(message):
 def enter_exam_handler(message):
     cid = message.chat.id
     if is_spam(cid) : 
-            return 
+        return 
     manage_user(message , cid)
     user_step.setdefault(cid , '')
     user_step[cid] = 'enterexamcode'
@@ -1265,7 +1383,7 @@ def enter_exam_handler(message):
 def enter_exam_handler(message):
     cid = message.chat.id
     if is_spam(cid) : 
-            return 
+        return 
     manage_user(message , cid)
     code = message.text.strip()
     exam_info = get_info_from_special_code(special_code=code)
@@ -1273,16 +1391,21 @@ def enter_exam_handler(message):
         bot.send_message(cid , text['examnotfound'])
         user_step.pop(cid)
     else :
+        exam_id = exam_info['id']
         active = exam_info['is_active']
-        if active == 0:
-            bot.send_message(cid , text['examisnotactive'])
+        if participation_in_exam(cid , exam_id) == False:
+            if active == 0:
+                bot.send_message(cid , text['examisnotactive'])
+            else :
+                markup = InlineKeyboardMarkup()
+                markup.add(InlineKeyboardButton(Button['examstart'] , callback_data=f'examstart_{exam_id}'))
+                bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['guideforenterexam'] , reply_markup=markup)
         else :
-            exam_id = exam_info['id']
-            markup = InlineKeyboardMarkup()
-            markup.add(InlineKeyboardButton(Button['examstart'] , callback_data=f'examstart_{exam_id}'))
-            bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['guideforenterexam'] , reply_markup=markup)
-    user_step.pop(cid)
-
+            bot.send_message(cid , text['youwasinthisexam'])
+    try :
+        user_step.pop(cid)
+    except :
+        pass
 # ------------------
 
 @bot.message_handler(func = lambda m : m.text == Button['teacherpanel'])
@@ -1574,7 +1697,7 @@ def add_multiple_question_handler(message):
 def send_guide_handler(message):
     cid = message.chat.id
     if is_spam(cid) :
-                return 
+        return 
     manage_user(message , cid)
     if (cid not in teachers) and (cid not in admins):
         markup = create_teacher_panel(cid)
@@ -1591,7 +1714,7 @@ def send_guide_handler(message):
 def show_photo_id_handler(message):
     cid = message.chat.id
     if is_spam(cid) :
-            return 
+        return 
     manage_user(message , cid)
     if (cid not in teachers) and (cid not in admins):
         markup = create_teacher_panel(cid)
@@ -1605,7 +1728,7 @@ def show_photo_id_handler(message):
 def send_photo_id(message):
     cid = message.chat.id
     if is_spam(cid) :
-            return 
+        return 
     manage_user(message , cid)
     if (cid not in teachers) and (cid not in admins):
         markup = create_teacher_panel(cid)
@@ -1619,12 +1742,25 @@ def send_photo_id(message):
         bot.send_message(cid , text['wrongfile'])
 
 # report ---------------------------------------------
+@bot.message_handler(func = lambda m : m.text == Button['examreport'])
+def quiz_report_handler(message):
+    cid = message.chat.id
+    if is_spam(cid) :
+        return 
+    manage_user(message , cid)
+    total_exams = get_exam_participation_cid(cid)
+    if len(total_exams) > 0:
+        data = get_exam_participation_cid(cid)
+        markup = create_inline_for_show_exams_for_report(data , 0)
+        bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['showreportforexam'] , reply_markup= markup)
+    else :
+        bot.send_message(cid , text['youdonthaveanyexam'])
 
 @bot.message_handler(func = lambda m : m.text == Button['quizreport'])
 def quiz_report_handler(message):
     cid = message.chat.id
     if is_spam(cid) :
-            return 
+        return 
     manage_user(message , cid)
     result_text = create_report_quiz(cid)
     markup = InlineKeyboardMarkup()
@@ -1648,7 +1784,7 @@ def information_receive_handler(message):
     cid = message.chat.id
     mid  = message.message_id
     if is_spam(cid) :
-            return 
+        return 
     manage_user(message , cid)
     markup = create_inlinekeyboard_for_teacher_request(cid , mid)
     for i in range(len(admins)):
@@ -1661,7 +1797,7 @@ def information_receive_handler(message):
 def teach_request_answer_handler(message) :
     cid = message.chat.id
     if is_spam(cid) :
-                return 
+        return 
     manage_user(message , cid)
     #teachreqans_{user_cid}_{user_mid}
     step = user_step.get(cid , False)
@@ -1961,7 +2097,7 @@ def get_option1_handler(message):
 def add_multiple_question_handler(message):
     cid = message.chat.id
     if is_spam(cid) : 
-            return
+        return
     manage_user(message , cid)
     file_name = message.document.file_name
     if check_excel_file(file_name):
@@ -2116,9 +2252,9 @@ def every_messages_handler(message):
 
 get_admins()
 get_teachers()
+
 print('bot is running !' , os.getcwd() , sep = ' ---> ')
 
 #skip_pending=True
-
 thread.start()
 bot.infinity_polling()

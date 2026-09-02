@@ -123,13 +123,13 @@ def get_report_quiz_from_telegram_id(cid):
     SQL_QUERY = '''
         select u.telegram_id , q.id as question_id ,  us.selected_option , q.answer_option , c.name as category_name
         
-        from quiz.user_answers as us 
+        from user_answers as us 
 
-        inner join quiz.users as u 
+        inner join users as u 
         on us.user_id = u.id 
-        inner join quiz.questions as q
+        inner join questions as q
         on q.id = us.question_id
-        inner join quiz.categories as c
+        inner join categories as c
         on q.category_id = c.id
 
         where telegram_id = (%s) and us.exam_id is null
@@ -142,6 +142,45 @@ def get_report_quiz_from_telegram_id(cid):
 
 # exam section ---------------------- 
 
+def participation_in_exam(cid , exam_id):
+    '''
+        True means user was in this exam before
+    '''
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor(dictionary=True)
+    SQL_QUERY = '''
+        select u.telegram_id , ua.exam_id from 
+        user_answers as ua 
+        inner join users as u
+        on u.id = ua.user_id
+        where u.telegram_id = (%s) and ua.exam_id = (%s);
+    '''
+    cur.execute(SQL_QUERY , (cid,exam_id))
+    result = cur.fetchall()
+    cur.close()
+    connection.close()
+    return len(result) > 0
+
+def get_report_exam_from_telegram_id(cid , exam_id):
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor(dictionary=True)
+    SQL_QUERY = '''
+        select u.telegram_id , ua.exam_id , ua.selected_option , q.answer_option , c.name as category_name
+        from 
+        user_answers as ua 
+        inner join questions as q
+        on ua.question_id = q.id 
+        inner join users as u
+        on u.id = ua.user_id 
+        inner join categories as c
+        on c.id = q.category_id
+        where u.telegram_id = (%s) and ua.exam_id = (%s);
+    '''
+    cur.execute(SQL_QUERY , (cid,exam_id))
+    result = cur.fetchall()
+    cur.close()
+    connection.close()
+    return result
 
 def what_option_answered_in_exam(user_id , question_id , exam_id):
     connection = mysql.connector.connect(**config , database = database_name)
@@ -186,6 +225,24 @@ def get_exams_from_user_id(user_id):
         SELECT id,name FROM exam WHERE designer_id = (%s)
     '''
     cur.execute(SQL_QUERY , (user_id , ))
+    result = cur.fetchall()
+    cur.close()
+    connection.close()
+    return result
+
+def get_exam_participation_cid(cid):
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor(dictionary=True)
+    SQL_QUERY = '''
+        select distinct exam_id , ex.name
+        from user_answers as ua 
+        inner join users as u 
+        on u.id = ua.user_id
+        inner join exam as ex
+        on ex.id = ua.exam_id
+        where u.telegram_id = (%s) and ua.exam_id is not null;
+    '''
+    cur.execute(SQL_QUERY , (cid , ))
     result = cur.fetchall()
     cur.close()
     connection.close()
@@ -243,9 +300,12 @@ def get_info_from_special_code(special_code):
     connection.close()
     return result
 
+
 if __name__ == '__main__':
-    print(is_answered_in_exam(1 , 1 , 1))
-    print(get_info_from_special_code('R9XB3WB'))
+    print(get_exam_participation_cid(1454840970))
+    # print(participation_in_exam(1454840970 , 1))
+    # print(is_answered_in_exam(1 , 1 , 1))
+    # print(get_info_from_special_code('R9XB3WB'))
     # print(get_report_quiz_from_telegram_id(1454840970)[2])
     # print(find_user_id(1454840970)['ID'])
     # print(find_designer_telegram_id(2))

@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-database_name = 'quiz'
+database_name = os.environ.get('database_name')
 
 config = {
     'host' : os.environ.get('host'),
