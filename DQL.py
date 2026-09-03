@@ -62,6 +62,45 @@ def get_users():
     connection.close()
     return result
 
+def get_user_data_from_cid(cid):
+    '''
+        output is a dictionary
+    '''
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor(dictionary=True)
+    SQL_QUERY = '''
+        SELECT name,username,is_admin,is_teacher FROM users WHERE telegram_id = (%s)
+    '''
+    cur.execute(SQL_QUERY , (cid,))
+    result = cur.fetchone()
+    cur.close()
+    connection.close()
+    return result
+
+def get_admins_db():
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor(dictionary=True)
+    SQL_QUERY = '''
+        SELECT telegram_id FROM users WHERE is_admin = 1;
+    '''
+    cur.execute(SQL_QUERY)
+    result = cur.fetchall()
+    cur.close()
+    connection.close()
+    return result
+
+def get_teachers_db():
+    connection = mysql.connector.connect(**config , database = database_name)
+    cur = connection.cursor(dictionary=True)
+    SQL_QUERY = '''
+        SELECT telegram_id FROM users WHERE is_teacher = 1;
+    '''
+    cur.execute(SQL_QUERY)
+    result = cur.fetchall()
+    cur.close()
+    connection.close()
+    return result
+
 def get_categories():
     connection = mysql.connector.connect(**config , database = database_name)
     cur = connection.cursor(dictionary=True)
@@ -302,7 +341,8 @@ def get_info_from_special_code(special_code):
 
 
 if __name__ == '__main__':
-    print(get_exam_participation_cid(1454840970))
+    print(get_user_data_from_cid(1454840970))
+    # print(get_exam_participation_cid(1454840970))
     # print(participation_in_exam(1454840970 , 1))
     # print(is_answered_in_exam(1 , 1 , 1))
     # print(get_info_from_special_code('R9XB3WB'))
