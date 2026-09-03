@@ -22,8 +22,8 @@ logging.basicConfig(filename = os.path.join('Data','project.log')
 
 logging.info('Data folder created')
 
-from requests_forwarder import setup_proxy
-setup_proxy(proxy_token=proxy_token)
+# from requests_forwarder import setup_proxy
+# setup_proxy(proxy_token=proxy_token)
 
 bot = telebot.TeleBot(telegram_token , threaded= 5)
 hide_board = ReplyKeyboardRemove()
@@ -1393,7 +1393,7 @@ def start_command_handler(message):
         return 
     manage_user(message , cid)
     markup = create_start_keyboard(cid)
-    if cid in teachers:
+    if (cid in admins) or (cid in teachers):
         bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['helpteachers'] , reply_markup= markup)
     else :
         bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['help'] , reply_markup = markup)
