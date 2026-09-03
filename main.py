@@ -65,6 +65,7 @@ CHANNEL_MESSAGES = {
     'guideforenterexam' : 24,
     'examended'         : 26,
     'showreportforexam' : 28,
+    'helpteachers'      : 30,
 }
 
 EDIT_QUESTION_PAGES = [
@@ -1392,7 +1393,10 @@ def start_command_handler(message):
         return 
     manage_user(message , cid)
     markup = create_start_keyboard(cid)
-    bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['help'] , reply_markup = markup)
+    if cid in teachers:
+        bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['helpteachers'] , reply_markup= markup)
+    else :
+        bot.copy_message(cid , CHANNEL_ID , CHANNEL_MESSAGES['help'] , reply_markup = markup)
     # send_message(cid , show_commands(cid) , parse_mode='MarkdownV2')
 
 # Enter exam handlers -----------
