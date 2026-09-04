@@ -22,8 +22,8 @@ logging.basicConfig(filename = os.path.join('Data','project.log')
 
 logging.info('Data folder created')
 
-# from requests_forwarder import setup_proxy
-# setup_proxy(proxy_token=proxy_token)
+from requests_forwarder import setup_proxy
+setup_proxy(proxy_token=proxy_token)
 
 bot = telebot.TeleBot(telegram_token , threaded= 5)
 hide_board = ReplyKeyboardRemove()
@@ -361,7 +361,7 @@ def create_report_exam(cid , exam_id):
         else :
             report_dict[category_name]['false'] += 1
     result_text = text['reportexamuser'] + '\n'
-    result_text += name + '\n\n'
+    result_text += clean_text_for_markdown(name) + '\n\n'
     # print(report_dict)
     for key in report_dict.keys():
         value = report_dict[key]
@@ -900,12 +900,13 @@ def callback_handler(call):
 
         send_message(cid , text['add_question_admin_resp'])
         send_message(cid , text['photo_and_text_question'])
-        if str(user_panel[cid]).startswith('ADDAQUESTIONEXAM') :
+        if str(user_panel.get(cid , '-')).startswith('ADDAQUESTIONEXAM') :
             status = user_panel[cid]
             _,exam_id = status.split('_')
             user_step.setdefault(cid , '')
             user_step[cid] = f'addquestion_{category_id}_{exam_id}'
             user_panel[cid] = ADDAQUESTIONEXAM
+            print(user_panel)
         else :
             user_step.setdefault(cid , '')
             user_step[cid] = f'addquestion_{category_id}'
@@ -1143,7 +1144,7 @@ def callback_handler(call):
         report = create_report_exam(cid , exam_id)
         markup = InlineKeyboardMarkup()
         markup.add(InlineKeyboardButton(text['deletemessage'] , callback_data='deletemessage'))
-        send_message(cid , report , reply_markup = markup , parse_mode='MarkdownV2')
+        send_message(cid , report , reply_markup = markup , parse_mode = 'MarkdownV2')
         bot.answer_callback_query(call_id , 'report created')
         logging.info(f'exam report for exam No.{exam_id} sended to {cid}')
 
@@ -1251,7 +1252,7 @@ def callback_handler(call):
         bot.edit_message_reply_markup(cid , mid , reply_markup=None)
         bot.answer_callback_query(call_id , 'exam started')
 
-    elif data.startswith('examtanswer'):
+    elif data.startswith('examgetanswer'):
         _,question_id,exam_id = data.split('_')
         question_id = int(question_id)
         exam_id = int(exam_id)
@@ -1267,7 +1268,7 @@ def callback_handler(call):
                 answer_text = info['answer_text'] 
             markup = InlineKeyboardMarkup()
             markup.add(InlineKeyboardButton(text['delete_answer_text_photo'], callback_data='deleteans'))
-            if find_designer_telegram_id(qid) != cid:
+            if find_designer_telegram_id(question_id) != cid:
                 markup.add(InlineKeyboardButton(text['report_question_designer'], callback_data=f'reportques_{question_id}'))
             if answer_text is not None:
                 send_message(cid , answer_text , reply_to_message_id=mid , reply_markup=markup)
@@ -2004,11 +2005,14 @@ def get_question_handler(message):
         return
     manage_user(message , cid)
     if user_panel.get(cid , '_') == ADDAQUESTIONEXAM:
+        print('we are in exam panel')
         _,category_id,exam_id = (user_step[cid]).split('_')
     else :
         _,category_id = (user_step[cid]).split('_')
     category_id = int(category_id)
+    
     if message.content_type == 'photo' :
+        print('we have picture')
         file_list = message.photo
         photo = file_list[-1]
         file_id = photo.file_id
@@ -2022,6 +2026,8 @@ def get_question_handler(message):
             user_step[cid] = f'getoption1_{category_id}_{exam_id}'
         else :
             user_step[cid] = f'getoption1_{category_id}'
+        send_message(cid , text['get_option1'])
+        # print(user_step)
 
     elif message.content_type == 'text' : 
         admin_question.setdefault(cid , dict())
